@@ -24,6 +24,7 @@ TYDOM_PASSWORD = "TYDOM_PASSWORD"
 TYDOM_POLLING_INTERVAL = "TYDOM_POLLING_INTERVAL"
 DELTADORE_LOGIN = "DELTADORE_LOGIN"
 DELTADORE_PASSWORD = "DELTADORE_PASSWORD"
+DELTADORE_SITE_NAME = "DELTADORE_SITE_NAME"
 THERMOSTAT_CUSTOM_PRESETS = "THERMOSTAT_CUSTOM_PRESETS"
 THERMOSTAT_COOL_MODE_TEMP_DEFAULT = "THERMOSTAT_COOL_MODE_TEMP_DEFAULT"
 THERMOSTAT_HEAT_MODE_TEMP_DEFAULT = "THERMOSTAT_HEAT_MODE_TEMP_DEFAULT"
@@ -64,6 +65,7 @@ class Configuration:
         self.tydom_polling_interval = os.getenv(TYDOM_POLLING_INTERVAL, 300)
         self.deltadore_login = os.getenv(DELTADORE_LOGIN, None)
         self.deltadore_password = os.getenv(DELTADORE_PASSWORD, None)
+        self.deltadore_site_name = os.getenv(DELTADORE_SITE_NAME, None)
         self.thermostat_custom_presets = os.getenv(THERMOSTAT_CUSTOM_PRESETS, None)
         self.thermostat_cool_mode_temp_default = os.getenv(
             THERMOSTAT_COOL_MODE_TEMP_DEFAULT, 26
@@ -117,6 +119,9 @@ class Configuration:
 
                     if TYDOM_ALARM_PIN in data and data[TYDOM_ALARM_PIN] != "":
                         self.tydom_alarm_pin = str(data[TYDOM_ALARM_PIN])
+
+                    if DELTADORE_SITE_NAME in data and data[DELTADORE_SITE_NAME] != "":
+                        self.deltadore_site_name = data[DELTADORE_SITE_NAME]
 
                     if (
                         TYDOM_ALARM_HOME_ZONE in data
@@ -174,10 +179,14 @@ class Configuration:
             and self.deltadore_password is not None
             and self.deltadore_password != ""
         ):
-            tydom_password = TydomClient.getTydomCredentials(
-                self.deltadore_login, self.deltadore_password, self.tydom_mac
+            tydom_mac, tydom_password = TydomClient.getTydomCredentials(
+                self.deltadore_login,
+                self.deltadore_password,
+                self.tydom_mac,
+                self.deltadore_site_name,
             )
             self.tydom_password = tydom_password
+            self.tydom_mac = tydom_mac
 
     def validate(self):
         configuration_to_print = copy.copy(self)
