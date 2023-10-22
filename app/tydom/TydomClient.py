@@ -65,7 +65,7 @@ class TydomClient:
             self.ping_timeout = None
 
     @staticmethod
-    def getTydomCredentials(login: str, password: str, macaddress: str):
+    def getTydomCredentials(login: str, password: str, macaddress: str, site_name: str):
         """get tydom credentials from Delta Dore"""
         try:
             response = requests.get(DELTADORE_AUTH_URL)
@@ -93,6 +93,27 @@ class TydomClient:
             json_response = response.json()
             response.close()
             access_token = json_response["access_token"]
+
+            if site_name is not None and site_name!= "":
+                params = {'offset': 0, 'limit': 60}
+                # TODO: handle pagination
+                response =requests.get(DELTADORE_SITE_LIST, headers={"Authorization": f"Bearer {access_token}"}, params=params)
+                known_sites = {}
+                for site in response.json()["site_access_list"]:
+                    site_label = site.get("label", None)
+                    site_mac = site.get("site", {}).get("gateway", {}).get("mac", "Unknown")
+                    known_sites[site_label] = site_mac
+                    if site_label == site_name:
+                        password = site.get("site", {}).get("gateway", {}).get("password", None)
+                        if password is not None:
+                            logger.debug("Your Tydom password for site %s (mac: %s) : %s", site_name, site.get("site", {}).get("gateway", {}).get("mac", "Unknown"), password) 
+                            return password
+                logger.error(
+                    "unable to find site with name %s. Will try with mac adress",
+                    site_name)
+                logger.error("available sites:")
+                for k, v in known_sites.items():
+                    logger.error("%s: %s" % (k, v))
 
             response = requests.get(DELTADORE_API_SITES + macaddress,
                                     headers={"Authorization": f"Bearer {access_token}"})
