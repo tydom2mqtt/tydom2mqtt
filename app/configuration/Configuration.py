@@ -23,6 +23,7 @@ TYDOM_MAC = 'TYDOM_MAC'
 TYDOM_PASSWORD = 'TYDOM_PASSWORD'
 DELTADORE_LOGIN = 'DELTADORE_LOGIN'
 DELTADORE_PASSWORD = 'DELTADORE_PASSWORD'
+DELTADORE_SITE_NAME = 'DELTADORE_SITE_NAME'
 THERMOSTAT_CUSTOM_PRESETS = 'THERMOSTAT_CUSTOM_PRESETS'
 
 
@@ -57,6 +58,7 @@ class Configuration:
         self.tydom_password = os.getenv(TYDOM_PASSWORD, None)
         self.deltadore_login = os.getenv(DELTADORE_LOGIN, None)
         self.deltadore_password = os.getenv(DELTADORE_PASSWORD, None)
+        self.deltadore_site_name = os.getenv(DELTADORE_SITE_NAME, None)
         self.thermostat_custom_presets = os.getenv(THERMOSTAT_CUSTOM_PRESETS, None)
 
     @staticmethod
@@ -95,6 +97,9 @@ class Configuration:
                     if DELTADORE_PASSWORD in data and data[DELTADORE_PASSWORD] != '':
                         self.deltadore_password = data[DELTADORE_PASSWORD]
 
+                    if DELTADORE_SITE_NAME in data and data[DELTADORE_SITE_NAME] != '':
+                        self.deltadore_site_name = data[DELTADORE_SITE_NAME]
+
                     if TYDOM_ALARM_PIN in data and data[TYDOM_ALARM_PIN] != '':
                         self.tydom_alarm_pin = str(data[TYDOM_ALARM_PIN])
 
@@ -128,7 +133,7 @@ class Configuration:
     def override_configuration_with_deltadore(self):
         if self.deltadore_login is not None and self.deltadore_login != '' and self.deltadore_password is not None and self.deltadore_password != '':
             tydom_password = TydomClient.getTydomCredentials(
-                self.deltadore_login, self.deltadore_password, self.tydom_mac)
+                self.deltadore_login, self.deltadore_password, self.tydom_mac, self.deltadore_site_name)
             self.tydom_password = tydom_password
 
     def validate(self):
