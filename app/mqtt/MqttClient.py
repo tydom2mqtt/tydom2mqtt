@@ -10,9 +10,11 @@ from gmqtt import Client as MQTTClient
 from sensors.Alarm import Alarm
 from sensors.Boiler import Boiler
 from sensors.Cover import Cover
+from sensors.Garage import Garage
 from sensors.Light import Light
 from sensors.Switch import Switch
 from sensors.ShHvac import ShHvac
+from sensors.AutomaticDoor import AutomaticDoor
 
 logger = logging.getLogger(__name__)
 
@@ -133,6 +135,40 @@ class MqttClient:
                 position=str(value),
             )
 
+        elif "set_garageLevelCmd" in str(topic):
+            value = payload.decode()
+            logger.info(
+                "set_garageLevelCmd message received (topic=%s, message=%s)",
+                topic,
+                value,
+            )
+            get_id = (topic.split("/"))[2]
+            device_id = (get_id.split("_"))[0]
+            endpoint_id = (get_id.split("_"))[1]
+            await Garage.put_garage_positionCmd(
+                tydom_client=self.tydom,
+                device_id=device_id,
+                cover_id=endpoint_id,
+                positionCmd=str(value),
+            )
+
+        elif ("set_garageLevel" in str(topic)) and "set_garageLevelCmd" not in str(
+            topic
+        ):
+            value = json.loads(payload)
+            logger.info(
+                "set_garageLevel message received (topic=%s, message=%s)", topic, value
+            )
+            get_id = (topic.split("/"))[2]
+            device_id = (get_id.split("_"))[0]
+            endpoint_id = (get_id.split("_"))[1]
+            await Garage.put_garage_position(
+                tydom_client=self.tydom,
+                device_id=device_id,
+                cover_id=endpoint_id,
+                position=str(value),
+            )
+
         elif "set_tilt" in str(topic):
             value = json.loads(payload)
             logger.info(
@@ -176,6 +212,23 @@ class MqttClient:
                 device_id=device_id,
                 light_id=endpoint_id,
                 level=str(value),
+            )
+
+        elif "open_automatic_door" in str(topic):
+            value = payload.decode()
+            logger.info(
+                "open_automatic_door message received (topic=%s, message=%s)",
+                topic,
+                value,
+            )
+            get_id = (topic.split("/"))[2]
+            device_id = (get_id.split("_"))[0]
+            endpoint_id = (get_id.split("_"))[1]
+            await AutomaticDoor.put_podPosition(
+                tydom_client=self.tydom,
+                device_id=device_id,
+                door_id=endpoint_id,
+                position="OPEN",
             )
 
         elif ("set_alarm_state" in str(topic)) and "homeassistant" not in str(topic):

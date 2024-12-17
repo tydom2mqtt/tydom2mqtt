@@ -7,10 +7,12 @@ from io import BytesIO
 from sensors.Alarm import Alarm
 from sensors.Boiler import Boiler
 from sensors.Cover import Cover
+from sensors.Garage import Garage
 from sensors.Light import Light
 from sensors.Sensor import Sensor
 from sensors.Switch import Switch
 from sensors.ShHvac import ShHvac
+from sensors.AutomaticDoor import AutomaticDoor
 
 logger = logging.getLogger(__name__)
 
@@ -100,12 +102,42 @@ deviceLightDetailsKeywords = [
     "onDusk",
 ]
 
-deviceDoorKeywords = ["openState", "intrusionDetect"]
+deviceDoorKeywords = [
+    "openState",
+    "intrusionDetect",
+    "battDefect",
+    "supervisionMode",
+    "calibrationDefect",
+]
 deviceDoorDetailsKeywords = [
     "onFavPos",
     "thermicDefect",
     "obstacleDefect",
-    "intrusion",
+    "intrusionDetect",
+    "battDefect",
+    "supervisionMode" "calibrationDefect",
+]
+
+deviceAutomaticDoorKeywords = ["podPosition"]
+deviceAutomaticDoorDetailsKeywords = ["podPosition"]
+
+deviceGaragelKeywords = [
+    "level",
+    "onDusk",
+    "onFavPos",
+    "onPresenceDetected" "thermicDefect",
+    "loadDefect",
+    "cmdDefect",
+    "battDefect",
+]
+
+deviceGarageDetailsKeywords = [
+    "level",
+    "onDusk",
+    "onFavPos",
+    "onPresenceDetected" "thermicDefect",
+    "loadDefect",
+    "cmdDefect",
     "battDefect",
 ]
 
@@ -128,6 +160,19 @@ deviceCoverDetailsKeywords = [
     "slope",
 ]
 
+deviceSensorsKeywords = [
+    "outTemperature",
+    "lightPower",
+    "configSensor",
+    "configTemp",
+    "battDefect",
+]
+deviceSensorsDetailsKeywords = [
+    "outTemperature" "lightPower",
+    "battDefect",
+    "configSensor",
+    "configTemp",
+]
 deviceBoilerKeywords = [
     "thermicLevel",
     "delayThermicLevel",
@@ -408,7 +453,10 @@ class MessageHandler:
                 or i["last_usage"] == "garage_door"
                 or i["last_usage"] == "gate"
                 or i["last_usage"] == "awning"
+                or i["last_usage"] == "garage_door_horizontal"
                 or i["last_usage"] == "others"
+                or i["last_usage"] == "sensorSun"
+                or i["last_usage"] == "sensorThermo"
             ):
                 device_name[device_unique_id] = i["name"]
                 device_type[device_unique_id] = i["last_usage"]
@@ -532,6 +580,7 @@ class MessageHandler:
             try:
                 attr_alarm = {}
                 attr_cover = {}
+                attr_garage = {}
                 attr_door = {}
                 attr_ukn = {}
                 attr_window = {}
@@ -540,6 +589,9 @@ class MessageHandler:
                 attr_boiler = {}
                 attr_sh_hvac = {}
                 attr_smoke = {}
+                attr_sensor = {}
+                attr_automatic_door = {}
+
                 endpoint_id = endpoint["id"]
                 unique_id = str(endpoint_id) + "_" + str(device_id)
                 name_of_id = self.get_name_from_id(unique_id)
@@ -607,6 +659,21 @@ class MessageHandler:
                             attr_door["element_name"] = element_name
                             attr_door[element_name] = element_value
 
+                    if type_of_id == "belmDoor" or type_of_id == "klineDoor":
+                        if (
+                            element_name in deviceAutomaticDoorKeywords
+                            and element_validity == "upToDate"
+                        ):
+                            attr_automatic_door["device_id"] = device_id
+                            attr_automatic_door["endpoint_id"] = endpoint_id
+                            attr_automatic_door["id"] = (
+                                str(device_id) + "_" + str(endpoint_id)
+                            )
+                            attr_automatic_door["name"] = print_id
+                            attr_automatic_door["device_type"] = "AutomaticDoor"
+                            attr_automatic_door["element_name"] = element_name
+                            attr_automatic_door[element_name] = element_value
+
                     if (
                         type_of_id == "windowFrench"
                         or type_of_id == "window"
@@ -626,6 +693,19 @@ class MessageHandler:
                             attr_window["device_type"] = "sensor"
                             attr_window["element_name"] = element_name
                             attr_window[element_name] = element_value
+
+                    if type_of_id == "sensorThermo" or type_of_id == "sensorSun":
+                        if (
+                            element_name in deviceSensorsKeywords
+                            and element_validity == "upToDate"
+                        ):
+                            attr_sensor["device_id"] = device_id
+                            attr_sensor["endpoint_id"] = endpoint_id
+                            attr_sensor["id"] = str(device_id) + "_" + str(endpoint_id)
+                            attr_sensor["name"] = print_id
+                            attr_sensor["device_type"] = "sensor"
+                            attr_sensor["element_name"] = element_name
+                            attr_sensor[element_name] = element_value
 
                     if type_of_id == "boiler":
                         if (
@@ -653,18 +733,26 @@ class MessageHandler:
                             attr_alarm["device_type"] = "alarm_control_panel"
                             attr_alarm[element_name] = element_value
 
-                    if type_of_id == "garage_door" or type_of_id == "gate":
+                    if (
+                        type_of_id == "garage_door_horizontal"
+                        or type_of_id == "garage_door"
+                        or type_of_id == "gate"
+                    ):
                         if (
-                            element_name in deviceSwitchKeywords
+                            element_name in deviceGaragelKeywords
                             and element_validity == "upToDate"
                         ):
-                            attr_gate["device_id"] = device_id
-                            attr_gate["endpoint_id"] = endpoint_id
-                            attr_gate["id"] = str(device_id) + "_" + str(endpoint_id)
-                            attr_gate["switch_name"] = print_id
-                            attr_gate["name"] = print_id
-                            attr_gate["device_type"] = "switch"
-                            attr_gate[element_name] = element_value
+                            attr_garage["device_id"] = device_id
+                            attr_garage["endpoint_id"] = endpoint_id
+                            attr_garage["id"] = str(device_id) + "_" + str(endpoint_id)
+                            attr_garage["cover_name"] = print_id
+                            attr_garage["name"] = print_id
+                            attr_garage["device_type"] = "garage"
+                            if type_of_id == "garage_door":
+                                attr_garage["cover_class"] = "garage"
+                            else:
+                                attr_garage["cover_class"] = "gate"
+                            attr_garage[element_name] = element_value
 
                     if type_of_id == "conso":
                         if (
@@ -774,6 +862,11 @@ class MessageHandler:
             if "device_type" in attr_cover and attr_cover["device_type"] == "cover":
                 new_cover = Cover(tydom_attributes=attr_cover, mqtt=self.mqtt_client)
                 await new_cover.update()
+            elif (
+                "device_type" in attr_garage and attr_garage["device_type"] == "garage"
+            ):
+                new_garage = Garage(tydom_attributes=attr_garage, mqtt=self.mqtt_client)
+                await new_garage.update()
             elif "device_type" in attr_door and attr_door["device_type"] == "sensor":
                 new_door = Sensor(
                     elem_name=attr_door["element_name"],
@@ -790,6 +883,15 @@ class MessageHandler:
                     mqtt=self.mqtt_client,
                 )
                 await new_window.update()
+            elif (
+                "device_type" in attr_sensor and attr_sensor["device_type"] == "sensor"
+            ):
+                new_sensor = Sensor(
+                    elem_name=attr_sensor["element_name"],
+                    tydom_attributes_payload=attr_sensor,
+                    mqtt=self.mqtt_client,
+                )
+                await new_sensor.update()
             elif "device_type" in attr_light and attr_light["device_type"] == "light":
                 new_light = Light(tydom_attributes=attr_light, mqtt=self.mqtt_client)
                 await new_light.update()
@@ -829,6 +931,16 @@ class MessageHandler:
                     mqtt=self.mqtt_client,
                 )
                 await new_sh_hvac.update()
+            elif (
+                "device_type" in attr_automatic_door
+                and attr_automatic_door["device_type"] == "AutomaticDoor"
+            ):
+                new_automatic_door = AutomaticDoor(
+                    tydom_attributes=attr_automatic_door,
+                    tydom_client=self.tydom_client,
+                    mqtt=self.mqtt_client,
+                )
+                await new_automatic_door.update()
 
             # Get last known state (for alarm) # NEW METHOD
             elif (

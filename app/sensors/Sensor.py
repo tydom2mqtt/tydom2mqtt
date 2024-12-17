@@ -26,6 +26,7 @@ class Sensor:
         # extracted from json, but it will make sensor not in payload to be
         # considered offline....
         self.parent_device_id = str(tydom_attributes_payload["id"])
+        self.parent_name = str(tydom_attributes_payload["name"])
         self.id = elem_name + "_tydom_" + str(tydom_attributes_payload["id"])
         self.name = elem_name
         if "device_class" in tydom_attributes_payload.keys():
@@ -105,6 +106,8 @@ class Sensor:
         self.device = {
             "manufacturer": "Delta Dore",
             "identifiers": self.parent_device_id,
+            "model": "Sensor",
+            "name": self.parent_name,
         }
 
         self.config_sensor_topic = sensor_config_topic.format(id=self.id)
