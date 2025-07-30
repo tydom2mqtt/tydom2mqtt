@@ -21,10 +21,13 @@ class Switch:
         self.device_id = self.attributes["device_id"]
         self.endpoint_id = self.attributes["endpoint_id"]
         self.id = self.attributes["id"]
-        self.name = self.attributes["switch_name"]
+        self.name = self.attributes.get("name", f"Switch_{self.device_id}")
 
         try:
             self.current_level = self.attributes["level"]
+        except KeyError:
+            logger.warning("Attribute 'level' missing for switch %s", self.name)
+            self.current_level = 0
         except Exception as e:
             logger.error(e)
             self.current_level = None
@@ -114,3 +117,4 @@ class Switch:
             await tydom_client.put_devices_data(
                 device_id, switch_id, "levelCmd", level_cmd
             )
+

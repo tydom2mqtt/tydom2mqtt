@@ -742,6 +742,25 @@ class MessageHandler:
                         or type_of_id == "garage_door"
                         or type_of_id == "gate"
                     ):
+                        attributes = endpoint.get("attributes", {})
+
+                        # Détection automatique d'un Tyxia 4620 : pas de 'position', mais présence de 'secured'
+                        is_probably_tyxia_switch = (
+                            not attributes or "secured" in attributes and "position" not in attributes
+                        )
+                        if is_probably_tyxia_switch:
+                            attr_switch = {
+                                "device_id": device_id,
+                                "endpoint_id": endpoint_id,
+                                "id": f"{device_id}_{endpoint_id}",
+                                "name": print_id,
+                                "device_type": "switch",
+                            }
+                            from sensors.Switch import Switch
+                            device = Switch(attr_switch, mqtt=self.mqtt_client)
+                            await device.setup()
+                            return  # On sort ici pour ne pas tomber dans le bloc 'cover'
+                        # Cas général pour garage / portail
                         if (
                             element_name in deviceGaragelKeywords
                             and element_validity == "upToDate"
