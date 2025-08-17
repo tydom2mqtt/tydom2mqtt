@@ -301,7 +301,7 @@ class TydomClient:
         await self.connection.send(a_bytes)
         return 0
 
-    async def put_alarm_cdata(self, device_id, alarm_id=None, value=None, zone_id=None):
+    async def put_alarm_cdata(self, device_id, alarm_id=None, value=None, zone_id=None, pin=None):
         # Credits to @mgcrea on github !
         # AWAY # "PUT /devices/{}/endpoints/{}/cdata?name=alarmCmd HTTP/1.1\r\ncontent-length: 29\r\ncontent-type: application/json; charset=utf-8\r\ntransac-id: request_124\r\n\r\n\r\n{"value":"ON","pwd":{}}\r\n\r\n"
         # HOME "PUT /devices/{}/endpoints/{}/cdata?name=zoneCmd HTTP/1.1\r\ncontent-length: 41\r\ncontent-type: application/json; charset=utf-8\r\ntransac-id: request_46\r\n\r\n\r\n{"value":"ON","pwd":"{}","zones":[1]}\r\n\r\n"
@@ -318,18 +318,18 @@ class TydomClient:
         # value
         # pwd
         # zones
-
-        if self.alarm_pin is None:
+        pin_to_use = pin if pin is not None else self.alarm_pin
+        if pin_to_use is None:
             logger.warning("Tydom alarm pin is not set!")
             pass
         try:
             if value == "ACK":
                 cmd = "ackEventCmd"
-                body = '{"pwd":"' + str(self.alarm_pin) + '"}'
+                body = '{"pwd":"' + str(pin_to_use) + '"}'
             elif zone_id is None:
                 cmd = "alarmCmd"
                 body = (
-                    '{"value":"' + str(value) + '","pwd":"' + str(self.alarm_pin) + '"}'
+                    '{"value":"' + str(value) + '","pwd":"' + str(pin_to_use) + '"}'
                 )
             else:
                 cmd = "zoneCmd"
