@@ -1118,21 +1118,77 @@ class MessageHandler:
 
     # PUT response DIRTY parsing
     def parse_put_response(self, bytes_str, start=6):
-        # TODO : Find a cooler way to parse nicely the PUT HTTP response
-        resp = bytes_str[len(self.cmd_prefix) :].decode("utf-8")
-        fields = resp.split("\r\n")
-        fields = fields[start:]  # ignore the PUT / HTTP/1.1
-        end_parsing = False
-        i = 0
-        output = str()
-        while not end_parsing:
-            field = fields[i]
-            if len(field) == 0 or field == "0":
-                end_parsing = True
-            else:
-                output += field
-                i = i + 2
-        parsed = json.loads(output)
+        """Parse incoming pseudo HTTP PUT push with optional chunked transfer.
+
+        Previous implementation skipped lines (size/data pairs) and failed when:
+          * JSON spanned multiple CRLF-delimited lines inside a single chunk
+          * Start offset differed (leading to truncated or prefixed body like '46...')
+        This version extracts headers/body, then properly de-chunks (hex sizes) and
+        assembles the JSON payload before decoding.
+        The 'start' parameter is kept for backward compatibility (ignored now).
+        """
+        raw_str = bytes_str[len(self.cmd_prefix) :].decode("utf-8", errors="ignore")
+
+        # Split headers and body
+        if "\r\n\r\n" not in raw_str:
+            logger.error("Malformed PUT frame (no header/body separator)")
+            raise ValueError("Malformed PUT frame")
+        header_part, body_part = raw_str.split("\r\n\r\n", 1)
+
+        # If not chunked just try JSON directly
+        if "Transfer-Encoding: chunked" not in header_part:
+            body = body_part.strip()
+            try:
+                parsed = json.loads(body)
+                return json.dumps(parsed)
+            except json.JSONDecodeError as e:
+                logger.error("JSON decode error (non-chunked) body=%s error=%s", body, e)
+                raise
+
+        # Chunked decoding
+        idx = 0
+        length = len(body_part)
+        assembled = []
+        while idx < length:
+            # Read chunk size line
+            line_end = body_part.find("\r\n", idx)
+            if line_end == -1:
+                break
+            size_line = body_part[idx:line_end].strip()
+            idx = line_end + 2
+            if size_line == "":
+                # skip potential blank lines
+                continue
+            if size_line == "0":
+                # End of chunks
+                break
+            # Some devices could (theoretically) send extensions after ';'
+            size_str = size_line.split(";", 1)[0]
+            try:
+                chunk_size = int(size_str, 16)
+            except ValueError:
+                # Not a proper chunk size -> treat remainder as body attempt
+                logger.debug("Unexpected chunk size line '%s', abort de-chunking", size_line)
+                assembled.append(body_part[idx:])
+                break
+            chunk = body_part[idx : idx + chunk_size]
+            assembled.append(chunk)
+            idx += chunk_size
+            # Skip trailing CRLF after chunk data if present
+            if body_part[idx : idx + 2] == "\r\n":
+                idx += 2
+
+        body = "".join(assembled).strip()
+        try:
+            parsed = json.loads(body)
+        except json.JSONDecodeError as e:
+            logger.error(
+                "JSON decode error after de-chunking body=%s error=%s (raw first 120 chars=%s)",
+                body,
+                e,
+                raw_str[:120],
+            )
+            raise
         return json.dumps(parsed)
 
     # FUNCTIONS

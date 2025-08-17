@@ -239,13 +239,22 @@ class MqttClient:
             get_id = (topic.split("/"))[2]
             device_id = (get_id.split("_"))[0]
             endpoint_id = (get_id.split("_"))[1]
+            action = payload
+            code = None
+            try: # try to decode the JSON payload, it it fails then the action will be the raw payload (like)
+                data = json.loads(payload)
+                action = data.get("action", action)
+                code = data.get("code")
+            except json.JSONDecodeError:
+                pass
             await Alarm.put_alarm_state(
                 tydom_client=self.tydom,
                 device_id=device_id,
                 alarm_id=endpoint_id,
-                asked_state=value,
+                asked_state=action,
                 home_zone=self.home_zone,
                 night_zone=self.night_zone,
+                pin=code,
             )
 
         elif "set_setpoint" in str(topic):
