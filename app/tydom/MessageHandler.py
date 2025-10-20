@@ -165,6 +165,7 @@ deviceCoverDetailsKeywords = [
 
 deviceSensorsKeywords = [
     "outTemperature",
+    "ambientTemperature",
     "lightPower",
     "configSensor",
     "configTemp",
@@ -172,6 +173,7 @@ deviceSensorsKeywords = [
 ]
 deviceSensorsDetailsKeywords = [
     "outTemperature",
+    "ambientTemperature",
     "lightPower",
     "battDefect",
     "configSensor",
