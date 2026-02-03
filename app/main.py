@@ -10,6 +10,8 @@ from configuration.Configuration import Configuration
 from mqtt.MqttClient import MqttClient
 from tydom.TydomClient import TydomClient
 from tydom.MessageHandler import MessageHandler
+from health.HealthState import HealthState
+from health.HealthServer import HealthServer
 
 # Setup logger configuration
 logging.basicConfig(level="INFO", format="%(asctime)s - %(message)s")
@@ -36,6 +38,16 @@ if configuration.log_level != "DEBUG":
     logging.getLogger("gmqtt").setLevel(logging.WARNING)
     logging.getLogger("websockets").setLevel(logging.WARNING)
 
+# Initialize health state singleton
+health_state = HealthState()
+# Set heartbeat timeout based on polling interval (2x polling interval)
+health_state.heartbeat_timeout = int(configuration.tydom_polling_interval) * 2
+
+# Initialize health server if enabled
+health_server = None
+if configuration.health_enabled:
+    health_server = HealthServer(port=configuration.health_port)
+
 
 # Listen to tydom events.
 async def listen_tydom():
@@ -46,6 +58,8 @@ async def listen_tydom():
             while True:
                 try:
                     incoming_bytes_str = await tydom_client.connection.recv()
+                    health_state.update_task_heartbeat("listen_tydom")
+                    health_state.update_tydom_message_time()
                     message_handler = MessageHandler(
                         incoming_bytes=incoming_bytes_str,
                         tydom_client=tydom_client,
@@ -72,6 +86,7 @@ async def poll_device_tydom():
     while True:
         try:
             await asyncio.sleep(tydom_client.polling_interval)
+            health_state.update_task_heartbeat("poll_device_tydom")
             await tydom_client.post_refresh()
         except Exception as e:
             logger.warning("poll_device_tydom error : %s", e)
@@ -108,6 +123,10 @@ async def shutdown(signal, loop):
     logging.info("Cancelling running tasks")
 
     try:
+        # Stop health server
+        if health_server is not None:
+            await health_server.stop()
+
         # Close connections
         await tydom_client.disconnect()
 
@@ -122,6 +141,11 @@ async def shutdown(signal, loop):
         loop.stop()
 
 
+async def start_health_server():
+    if health_server is not None:
+        await health_server.start()
+
+
 def main():
     loop = asyncio.new_event_loop()
     signals = (signal.SIGHUP, signal.SIGTERM, signal.SIGINT)
@@ -131,6 +155,7 @@ def main():
     loop.create_task(mqtt_client.connect())
     loop.create_task(listen_tydom())
     loop.create_task(poll_device_tydom())
+    loop.create_task(start_health_server())
     loop.run_forever()
 
 
