@@ -327,19 +327,18 @@ class Boiler:
             )
 
     @staticmethod
-    async def put_hvac_mode(tydom_client, device_id, boiler_id, set_hvac_mode):
+    async def put_hvac_mode(tydom_client, device_id, boiler_id, set_hvac_mode, mqtt_client=None):
         logger.info("%s %s %s", boiler_id, "set_hvacMode", set_hvac_mode)
+        entity_id = f"{device_id}_{boiler_id}"
 
         if set_hvac_mode == "off":
             await tydom_client.put_devices_data(
                 device_id, boiler_id, "thermicLevel", "STOP"
             )
-            await tydom_client.put_devices_data(
-                device_id, boiler_id, "authorization", "STOP"
-            )
-            await tydom_client.put_devices_data(
-                device_id, boiler_id, "hvacMode", set_hvac_mode
-            )
+            await tydom_client.put_areas_data(device_id, {"authorization": "STOP"})
+            if mqtt_client is not None:
+                mqtt_client.publish(mode_state_topic.format(id=entity_id), "off", qos=0, retain=True)
+                mqtt_client.publish(preset_mode_state_topic.format(id=entity_id), "STOP", qos=0, retain=True)
         elif set_hvac_mode == "cool":
             await tydom_client.put_devices_data(
                 device_id, boiler_id, "thermicLevel", ""
@@ -350,16 +349,10 @@ class Boiler:
                 "setpoint",
                 str(tydom_client.thermostat_heat_mode_temp_default),
             )
-            await tydom_client.put_devices_data(
-                device_id, boiler_id, "authorization", "COOLING"
-            )
-            await tydom_client.put_devices_data(
-                device_id, boiler_id, "hvacMode", set_hvac_mode
-            )
+            await tydom_client.put_areas_data(device_id, {"authorization": "COOLING"})
+            if mqtt_client is not None:
+                mqtt_client.publish(mode_state_topic.format(id=entity_id), "cool", qos=0, retain=True)
         else:
-            await tydom_client.put_devices_data(
-                device_id, boiler_id, "hvacMode", "heat"
-            )
             await tydom_client.put_devices_data(
                 device_id, boiler_id, "thermicLevel", ""
             )
@@ -369,9 +362,9 @@ class Boiler:
                 "setpoint",
                 str(tydom_client.thermostat_cool_mode_temp_default),
             )
-            await tydom_client.put_devices_data(
-                device_id, boiler_id, "authorization", "HEATING"
-            )
+            await tydom_client.put_areas_data(device_id, {"authorization": "HEATING"})
+            if mqtt_client is not None:
+                mqtt_client.publish(mode_state_topic.format(id=entity_id), "heat", qos=0, retain=True)
 
     @staticmethod
     async def put_thermic_level(tydom_client, device_id, boiler_id, set_thermic_level):

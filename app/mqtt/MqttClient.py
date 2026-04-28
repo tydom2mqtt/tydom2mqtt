@@ -278,6 +278,7 @@ class MqttClient:
                 device_id=device_id,
                 boiler_id=endpoint_id,
                 set_hvac_mode=str(value),
+                mqtt_client=self.mqtt_client,
             )
 
         elif "set_thermicLevel" in str(topic):
