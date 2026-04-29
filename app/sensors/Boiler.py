@@ -338,11 +338,28 @@ class Boiler:
         logger.info("%s %s %s", boiler_id, "set_hvacMode", set_hvac_mode)
         entity_id = f"{device_id}_{boiler_id}"
 
+        # Note: switching the zone-level heat/cool authorization from HA is NOT
+        # supported by Tydom over the public protocol used here — PUT /areas/<id>/data
+        # returns HTTP 404 (the boiler's device_id is not a valid area path), and
+        # PUT /devices/<id>/endpoints/<id>/data with "authorization" returns 200 but
+        # is silently ignored by Tydom. The real channel appears to be the
+        # "events/home/hvac" stream emitted by the master thermostat, which is not
+        # yet handled (see tydom2mqtt issue #177).
+        #
+        # What does work and is therefore implemented here:
+        #   - off  : per-thermostat thermicLevel = STOP      (turns this thermostat off)
+        #   - cool : per-thermostat thermicLevel = ""         (releases the STOP, thermostat
+        #            follows the area's current authorization). Setpoint is reset to the
+        #            configured default.
+        #   - heat : same as cool, with the heat-mode default setpoint.
+        #
+        # Optimistic MQTT publishes give immediate UI feedback; the next /areas/data
+        # poll re-publishes the authoritative mode (combining thermicLevel and the
+        # area authorization), correcting any short-lived mismatch.
         if set_hvac_mode == "off":
             await tydom_client.put_devices_data(
                 device_id, boiler_id, "thermicLevel", "STOP"
             )
-            await tydom_client.put_areas_data(device_id, {"authorization": "STOP"})
             if mqtt_client is not None:
                 mqtt_client.publish(mode_state_topic.format(id=entity_id), "off", qos=0, retain=True)
                 mqtt_client.publish(preset_mode_state_topic.format(id=entity_id), "STOP", qos=0, retain=True)
@@ -356,7 +373,6 @@ class Boiler:
                 "setpoint",
                 str(tydom_client.thermostat_heat_mode_temp_default),
             )
-            await tydom_client.put_areas_data(device_id, {"authorization": "COOLING"})
             if mqtt_client is not None:
                 mqtt_client.publish(mode_state_topic.format(id=entity_id), "cool", qos=0, retain=True)
         else:
@@ -369,7 +385,6 @@ class Boiler:
                 "setpoint",
                 str(tydom_client.thermostat_cool_mode_temp_default),
             )
-            await tydom_client.put_areas_data(device_id, {"authorization": "HEATING"})
             if mqtt_client is not None:
                 mqtt_client.publish(mode_state_topic.format(id=entity_id), "heat", qos=0, retain=True)
 
