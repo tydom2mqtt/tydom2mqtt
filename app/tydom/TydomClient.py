@@ -301,6 +301,28 @@ class TydomClient:
         await self.connection.send(a_bytes)
         return 0
 
+    async def put_home_hvac_mode(self, mode):
+        """Set the zone-level HVAC mode (STOP / HEATING / COOLING).
+
+        Tells the heat pump which way to run (or stop). Tydom acknowledges
+        with a 200 OK then broadcasts the resulting state to all clients via
+        PUT /devices/data (per-thermostat authorization update) and
+        POST /events/home/hvac.
+        """
+        body = '{"mode":"' + mode + '"}'
+        str_request = (
+            self.cmd_prefix
+            + "PUT /home/hvac/data HTTP/1.1\r\nContent-Length: "
+            + str(len(body))
+            + "\r\nContent-Type: application/json; charset=UTF-8\r\nTransac-Id: 0\r\n\r\n"
+            + body
+            + "\r\n\r\n"
+        )
+        a_bytes = bytes(str_request, "ascii")
+        logger.debug("Sending message to tydom (%s %s)", "PUT home hvac data", body)
+        await self.connection.send(a_bytes)
+        return 0
+
     async def put_alarm_cdata(self, device_id, alarm_id=None, value=None, zone_id=None):
         # Credits to @mgcrea on github !
         # AWAY # "PUT /devices/{}/endpoints/{}/cdata?name=alarmCmd HTTP/1.1\r\ncontent-length: 29\r\ncontent-type: application/json; charset=utf-8\r\ntransac-id: request_124\r\n\r\n\r\n{"value":"ON","pwd":{}}\r\n\r\n"

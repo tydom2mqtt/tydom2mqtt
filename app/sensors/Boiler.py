@@ -338,24 +338,26 @@ class Boiler:
         logger.info("%s %s %s", boiler_id, "set_hvacMode", set_hvac_mode)
         entity_id = f"{device_id}_{boiler_id}"
 
-        # Note: switching the zone-level heat/cool authorization from HA is NOT
-        # supported by Tydom over the public protocol used here — PUT /areas/<id>/data
-        # returns HTTP 404 (the boiler's device_id is not a valid area path), and
-        # PUT /devices/<id>/endpoints/<id>/data with "authorization" returns 200 but
-        # is silently ignored by Tydom. The real channel appears to be the
-        # "events/home/hvac" stream emitted by the master thermostat, which is not
-        # yet handled (see tydom2mqtt issue #177).
+        # Two control surfaces are involved:
         #
-        # What does work and is therefore implemented here:
-        #   - off  : per-thermostat thermicLevel = STOP      (turns this thermostat off)
-        #   - cool : per-thermostat thermicLevel = ""         (releases the STOP, thermostat
-        #            follows the area's current authorization). Setpoint is reset to the
-        #            configured default.
-        #   - heat : same as cool, with the heat-mode default setpoint.
+        #   1. Zone-level HVAC direction (heat pump direction):
+        #        PUT /home/hvac/data {"mode": "STOP"|"HEATING"|"COOLING"}
+        #      Tydom broadcasts the result via PUT /devices/data (per-thermostat
+        #      authorization update) and POST /events/home/hvac.
         #
-        # Optimistic MQTT publishes give immediate UI feedback; the next /areas/data
-        # poll re-publishes the authoritative mode (combining thermicLevel and the
-        # area authorization), correcting any short-lived mismatch.
+        #   2. Per-thermostat preset:
+        #        PUT /devices/<id>/endpoints/<id>/data thermicLevel = STOP / "" / preset
+        #      "STOP" parks the thermostat regardless of zone direction; "" releases
+        #      it to follow the zone direction.
+        #
+        # Mapping HA modes:
+        #   - off  : thermicLevel = STOP only (per-thermostat). Does NOT change zone
+        #            direction, so siblings sharing the heat pump keep running.
+        #   - cool : zone -> COOLING, thermicLevel -> "" (active), reset setpoint
+        #   - heat : zone -> HEATING, thermicLevel -> "" (active), reset setpoint
+        #
+        # Optimistic MQTT publishes give immediate UI feedback; the next push from
+        # Tydom (broadcast on the open WebSocket) confirms or corrects the state.
         if set_hvac_mode == "off":
             await tydom_client.put_devices_data(
                 device_id, boiler_id, "thermicLevel", "STOP"
@@ -364,6 +366,7 @@ class Boiler:
                 mqtt_client.publish(mode_state_topic.format(id=entity_id), "off", qos=0, retain=True)
                 mqtt_client.publish(preset_mode_state_topic.format(id=entity_id), "STOP", qos=0, retain=True)
         elif set_hvac_mode == "cool":
+            await tydom_client.put_home_hvac_mode("COOLING")
             await tydom_client.put_devices_data(
                 device_id, boiler_id, "thermicLevel", ""
             )
@@ -376,6 +379,7 @@ class Boiler:
             if mqtt_client is not None:
                 mqtt_client.publish(mode_state_topic.format(id=entity_id), "cool", qos=0, retain=True)
         else:
+            await tydom_client.put_home_hvac_mode("HEATING")
             await tydom_client.put_devices_data(
                 device_id, boiler_id, "thermicLevel", ""
             )
