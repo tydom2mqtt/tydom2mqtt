@@ -1,3 +1,5 @@
 .idea/
 .git/
 **/__pycache__/
+# Never bake local secrets into the image
+*.env

@@ -5,10 +5,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  issues: write
-  pull-requests: write
-  contents: write
-  checks: write
+  contents: read
 
 on:
   push:
@@ -16,14 +13,31 @@ on:
       - master
   pull_request:
 
-jobs:
-  semantic-pr:
-    if: github.event_name == 'pull_request'
-    name: 🏷️ PR is semantic
-    uses: VeryGoodOpenSource/very_good_workflows/.github/workflows/semantic_pull_request.yml@v1
+env:
+  PYTHON_VERSION: '3.11'
 
-  format:
-    name: ✨ Ruff check
+jobs:
+  lint:
+    name: ✨ Ruff
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📚 Git Checkout
+        uses: actions/checkout@v4
+
+      - name: ✨ Ruff check formatting
+        uses: astral-sh/ruff-action@v2
+        with:
+          src: "./app"
+          args: "format --check"
+
+      - name: ✨ Ruff lint
+        uses: astral-sh/ruff-action@v2
+        with:
+          src: "./app"
+          args: "check"
+
+  test:
+    name: 🧪 Tests
     runs-on: ubuntu-latest
     steps:
       - name: 📚 Git Checkout
@@ -32,22 +46,39 @@ jobs:
       - name: 🐍 Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.x'
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: |
+            app/requirements.txt
+            app/requirements.dev.txt
 
       - name: 📦 Install dependencies
+        working-directory: app
         run: |
-          cd app
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -r requirements.dev.txt
+          pip install -r requirements.txt -r requirements.dev.txt
 
-      - name: ✨ Ruff check formatting
-        uses: astral-sh/ruff-action@v2
-        with:
-          src: "./app"
-          args: "format --check"
+      - name: 🧪 Run pytest
+        working-directory: app
+        run: |
+          # Exit code 5 means "no tests collected" — not a failure while the
+          # suite is still being built out.
+          pytest || [ $? -eq 5 ]
 
-      - name: ✨ Ruff check
-        uses: astral-sh/ruff-action@v2
+  docker:
+    name: 🐳 Docker build
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📚 Git Checkout
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 🐳 Build image (no push)
+        uses: docker/build-push-action@v6
         with:
-          src: "./app"
+          context: .
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
