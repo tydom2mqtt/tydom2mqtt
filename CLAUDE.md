@@ -23,7 +23,7 @@ All source lives under [`app/`](app):
   `Alarm`, `Boiler`, `Switch`, `Garage`, `ShHvac`, `AutomaticDoor`, …). Each
   handles its own Home Assistant MQTT discovery + state publishing.
 
-Docs are in [`docs/`](docs) (MkDocs site). User-facing config is documented there.
+Docs are in [`docs/`](docs) (docsify site). User-facing config is documented there.
 
 ## Dev workflow
 
@@ -74,10 +74,13 @@ docker run -it --rm -e TYDOM_MAC="001A25123456" -e TYDOM_PASSWORD="secret" tydom
 
 ## CI
 
-[`.github/workflows/ci.yaml`](.github/workflows/ci.yaml) runs on every PR:
-semantic PR title check, Ruff (format + lint), pytest, and a Docker build.
+[`.github/workflows/ci.yaml`](.github/workflows/ci.yaml) runs Ruff (format +
+lint), pytest, and a Docker build on every PR. The semantic PR title check
+runs separately in
+[`.github/workflows/semantic-pr.yaml`](.github/workflows/semantic-pr.yaml).
 [`.github/workflows/release_build.yaml`](.github/workflows/release_build.yaml)
-builds and pushes the multi-arch image to GHCR on `master` and tags.
+builds and pushes the multi-arch image to GHCR on version tags (`*.*.*`) and
+manual dispatch.
 
 Python is pinned to **3.11** (matches the Dockerfile base image).
 

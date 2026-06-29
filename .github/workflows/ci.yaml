@@ -5,10 +5,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  issues: write
-  pull-requests: write
-  contents: write
-  checks: write
+  contents: read
 
 on:
   push:

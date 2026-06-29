@@ -36,7 +36,8 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          # latest=auto tags `latest` for the highest semver release.
+          # metadata-action's default flavor (latest=auto) also tags `latest`
+          # on non-prerelease semver tag builds.
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
