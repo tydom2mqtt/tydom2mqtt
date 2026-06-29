@@ -27,6 +27,8 @@ DELTADORE_PASSWORD = "DELTADORE_PASSWORD"
 THERMOSTAT_CUSTOM_PRESETS = "THERMOSTAT_CUSTOM_PRESETS"
 THERMOSTAT_COOL_MODE_TEMP_DEFAULT = "THERMOSTAT_COOL_MODE_TEMP_DEFAULT"
 THERMOSTAT_HEAT_MODE_TEMP_DEFAULT = "THERMOSTAT_HEAT_MODE_TEMP_DEFAULT"
+HEALTH_ENABLED = "HEALTH_ENABLED"
+HEALTH_PORT = "HEALTH_PORT"
 
 
 @dataclass
@@ -47,6 +49,8 @@ class Configuration:
     thermostat_cool_mode_temp_default = int
     thermostat_heat_mode_temp_default = int
     tydom_polling_interval = int
+    health_enabled = bool
+    health_port = int
 
     def __init__(self):
         self.log_level = os.getenv(LOG_LEVEL, "INFO").upper()
@@ -71,6 +75,9 @@ class Configuration:
         self.thermostat_heat_mode_temp_default = os.getenv(
             THERMOSTAT_HEAT_MODE_TEMP_DEFAULT, 16
         )
+        health_enabled_str = os.getenv(HEALTH_ENABLED, "true").lower()
+        self.health_enabled = health_enabled_str in ("true", "1", "yes")
+        self.health_port = int(os.getenv(HEALTH_PORT, 8080))
 
     @staticmethod
     def load():
