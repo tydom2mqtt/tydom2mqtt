@@ -37,11 +37,20 @@ class Sensor:
 
         if "unit_of_measurement" in tydom_attributes_payload.keys():
             self.unit_of_measurement = tydom_attributes_payload["unit_of_measurement"]
+        else:
+            # Fallback for known sensor types that should have units
+            self.unit_of_measurement = self._get_default_unit_for_sensor(elem_name)
 
         self.mqtt = mqtt
         self.binary = False
 
-        if "unit_of_measurement" not in tydom_attributes_payload.keys() and (
+        # Check if this should be a binary sensor (no units and boolean-like values)
+        has_unit = (
+            "unit_of_measurement" in tydom_attributes_payload.keys()
+            or self.unit_of_measurement is not None
+        )
+
+        if not has_unit and (
             self.elem_value in ["0", "1", "true", "false", "True", "False", "ON", "OFF"]
             or isinstance(self.elem_value, bool)
         ):
@@ -65,6 +74,30 @@ class Sensor:
         else:
             self.json_attributes_topic = sensor_json_attributes_topic.format(id=self.id)
             self.config_topic = sensor_config_topic.format(id=self.id)
+
+    def _get_default_unit_for_sensor(self, elem_name):
+        """Get default unit of measurement for known sensor types."""
+        default_units = {
+            "outTemperature": "°C",
+            "temperature": "°C",
+            "lightPower": "W",
+            "power": "W",
+            "energyInstantTotElec": "A",
+            "energyInstantTotElecP": "W",
+            "energyTotIndexWatt": "Wh",
+            "energyIndexHeatWatt": "Wh",
+            "energyIndexECSWatt": "Wh",
+            "energyIndexHeatGas": "Wh",
+            # Add more common sensor types
+            "humidity": "%",
+            "pressure": "hPa",
+            "batteryLevel": "%",
+            "current": "A",
+            "voltage": "V",
+            "energy": "Wh",
+            "setpoint": "°C",
+        }
+        return default_units.get(elem_name, None)
 
     # SENSOR:
     # None: Generic sensor. This is the default and doesn’t need to be set.
@@ -122,7 +155,8 @@ class Sensor:
         except AttributeError:
             pass
         try:
-            self.config["unit_of_measurement"] = self.unit_of_measurement
+            if self.unit_of_measurement is not None:
+                self.config["unit_of_measurement"] = self.unit_of_measurement
         except AttributeError:
             pass
 
@@ -153,8 +187,14 @@ class Sensor:
                     self.json_attributes_topic, self.elem_value, qos=0, retain=True
                 )
             if not self.binary:
+                unit_info = (
+                    f" {self.unit_of_measurement}" if self.unit_of_measurement else ""
+                )
                 logger.info(
-                    "Sensor created / updated : %s %s", self.name, self.elem_value
+                    "Sensor created / updated : %s %s%s",
+                    self.name,
+                    self.elem_value,
+                    unit_info,
                 )
             else:
                 logger.info(
