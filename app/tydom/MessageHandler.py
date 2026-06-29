@@ -437,8 +437,11 @@ class MessageHandler:
 
                     elif msg_type == "msg_area_authorization":
                         parsed = json.loads(data)
-                        logger.debug("Zone authorization notification: mode=%s support=%s",
-                                     parsed.get("mode"), parsed.get("support"))
+                        logger.debug(
+                            "Zone authorization notification: mode=%s support=%s",
+                            parsed.get("mode"),
+                            parsed.get("support"),
+                        )
                 except Exception as e:
                     logger.error("Error on parsing tydom response (%s)", e)
                     logger.error("Incoming data (%s)", data)
