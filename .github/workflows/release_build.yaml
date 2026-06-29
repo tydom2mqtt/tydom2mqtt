@@ -36,27 +36,22 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          # latest=auto tags `latest` for the highest semver release.
           tags: |
-            type=schedule
-            type=ref,event=branch
-            type=ref,event=pr
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
-            type=sha
-            type=raw,value=latest,enable={{is_default_branch}}
       - name: 🐳 Build and push
         uses: docker/build-push-action@v6
         id: push
         with:
-          push: ${{ github.event_name != 'pull_request' }}
+          push: true
           platforms: "linux/arm/v6,linux/arm/v7,linux/arm64/v8,linux/amd64"
-          tags: ghcr.io/${{ steps.meta.outputs.tags }}
+          tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
       - name: 🔖 Generate artifact attestation
         uses: actions/attest-build-provenance@v2
-        if: github.event_name != 'pull_request'
         with:
           subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}
           subject-digest: ${{ steps.push.outputs.digest }}
