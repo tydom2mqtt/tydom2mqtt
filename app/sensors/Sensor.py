@@ -45,9 +45,11 @@ class Sensor:
         self.binary = False
 
         # Check if this should be a binary sensor (no units and boolean-like values)
-        has_unit = ("unit_of_measurement" in tydom_attributes_payload.keys() or 
-                   hasattr(self, 'unit_of_measurement') and self.unit_of_measurement is not None)
-        
+        has_unit = (
+            "unit_of_measurement" in tydom_attributes_payload.keys()
+            or self.unit_of_measurement is not None
+        )
+
         if not has_unit and (
             self.elem_value in ["0", "1", "true", "false", "True", "False", "ON", "OFF"]
             or isinstance(self.elem_value, bool)
@@ -79,7 +81,7 @@ class Sensor:
             "outTemperature": "°C",
             "temperature": "°C",
             "lightPower": "W",
-            "power": "W", 
+            "power": "W",
             "energyInstantTotElec": "A",
             "energyInstantTotElecP": "W",
             "energyTotIndexWatt": "Wh",
@@ -153,7 +155,7 @@ class Sensor:
         except AttributeError:
             pass
         try:
-            if hasattr(self, 'unit_of_measurement') and self.unit_of_measurement is not None:
+            if self.unit_of_measurement is not None:
                 self.config["unit_of_measurement"] = self.unit_of_measurement
         except AttributeError:
             pass
@@ -185,9 +187,14 @@ class Sensor:
                     self.json_attributes_topic, self.elem_value, qos=0, retain=True
                 )
             if not self.binary:
-                unit_info = f" {self.unit_of_measurement}" if hasattr(self, 'unit_of_measurement') and self.unit_of_measurement else ""
+                unit_info = (
+                    f" {self.unit_of_measurement}" if self.unit_of_measurement else ""
+                )
                 logger.info(
-                    "Sensor created / updated : %s %s%s", self.name, self.elem_value, unit_info
+                    "Sensor created / updated : %s %s%s",
+                    self.name,
+                    self.elem_value,
+                    unit_info,
                 )
             else:
                 logger.info(
