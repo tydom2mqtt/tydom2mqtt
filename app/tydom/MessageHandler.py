@@ -1,4 +1,5 @@
 import json
+import re
 import logging
 from http.client import HTTPResponse
 from http.server import BaseHTTPRequestHandler
@@ -1011,7 +1012,13 @@ class MessageHandler:
     async def parse_devices_cdata(self, parsed):
         for i in parsed:
             for endpoint in i["endpoints"]:
-                if endpoint["error"] == 0 and len(endpoint["cdata"]) > 0:
+                if endpoint.get("error") == 0 and endpoint.get("cdata"):
+                    if all(entry == {"EOR": True} for entry in endpoint["cdata"]):
+                        logger.debug(
+                            "parse_devices_cdata(%s) : message ignored", parsed
+                        )
+                        continue
+
                     try:
                         device_id = i["id"]
                         endpoint_id = endpoint["id"]
@@ -1028,6 +1035,19 @@ class MessageHandler:
 
                         for elem in endpoint["cdata"]:
                             if type_of_id == "conso":
+                                if (
+                                    elem["status"] == "srcNOK"
+                                    or elem["status"] == "destNOK"
+                                ):
+                                    logger.debug(
+                                        "parse_devices_cdata(%s) : message type=%s name=%s ignored for status=%s",
+                                        parsed,
+                                        elem["name"],
+                                        type_of_id,
+                                        elem["status"],
+                                    )
+                                    continue
+
                                 if elem["name"] == "energyIndex":
                                     device_class_of_id = "energy"
                                     state_class_of_id = "total_increasing"
@@ -1116,24 +1136,31 @@ class MessageHandler:
                     except Exception as e:
                         logger.error("Error when parsing msg_cdata (%s)", e)
 
-    # PUT response DIRTY parsing
+    # PUT response parsing v2
     def parse_put_response(self, bytes_str, start=6):
-        # TODO : Find a cooler way to parse nicely the PUT HTTP response
+        # Decode the response into UTF-8
         resp = bytes_str[len(self.cmd_prefix) :].decode("utf-8")
+
+        # Separate lines with \r\n
         fields = resp.split("\r\n")
-        fields = fields[start:]  # ignore the PUT / HTTP/1.1
-        end_parsing = False
-        i = 0
-        output = str()
-        while not end_parsing:
-            field = fields[i]
-            if len(field) == 0 or field == "0":
-                end_parsing = True
-            else:
-                output += field
-                i = i + 2
-        parsed = json.loads(output)
-        return json.dumps(parsed)
+
+        # Remove the first HTTP lines (headers)
+        fields = fields[start:]
+
+        # Detect and extract JSON ignoring chunk sizes
+        json_chunks = []
+        for field in fields:
+            if re.match(r"^[0-9A-Fa-f]+$", field):  # Ignore hex chunk sizes
+                continue
+            if field == "0":  # End of chunked encoding
+                break
+            json_chunks.append(field)
+
+        output = "".join(json_chunks)
+
+        logger.debug("parse_put_response, result : %s", output)
+
+        return output
 
     # FUNCTIONS
 
