@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Docker healthcheck script for tydom2mqtt."""
+
 import http.client
 import os
 import sys

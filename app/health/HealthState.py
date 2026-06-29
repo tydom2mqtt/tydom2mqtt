@@ -27,9 +27,22 @@ class HealthState:
         self.last_tydom_message_time: Optional[float] = None
         self.tasks_heartbeat: Dict[str, float] = {}
 
-        # Configuration
-        self.message_timeout: int = 300  # 5 minutes default
-        self.heartbeat_timeout: int = 600  # 10 minutes default (2x polling interval)
+        # Timeout configuration. These are conservative startup defaults;
+        # main.py overrides both at boot via set_timeouts_from_polling_interval()
+        # so they scale with the Tydom polling interval.
+        self.message_timeout: int = 600  # max age of last Tydom message (seconds)
+        self.heartbeat_timeout: int = 600  # max age of a task heartbeat (seconds)
+
+    def set_timeouts_from_polling_interval(self, polling_interval: int) -> None:
+        """Derive the health timeouts from the Tydom polling interval.
+
+        Both signals must tolerate at least one full polling cycle plus the
+        latency of the response, otherwise a quiet-but-working installation
+        (whose only guaranteed traffic is the periodic poll) would flap
+        unhealthy. We use 2x the interval with a 600s floor.
+        """
+        self.heartbeat_timeout = max(600, polling_interval * 2)
+        self.message_timeout = max(600, polling_interval * 2)
 
     def update_mqtt_status(self, connected: bool) -> None:
         """Update MQTT connection status."""

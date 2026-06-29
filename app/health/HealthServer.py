@@ -22,9 +22,7 @@ class HealthServer:
         """Handle an incoming HTTP request."""
         try:
             # Read the request line
-            request_line = await asyncio.wait_for(
-                reader.readline(), timeout=5.0
-            )
+            request_line = await asyncio.wait_for(reader.readline(), timeout=5.0)
             if not request_line:
                 return
 
