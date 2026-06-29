@@ -5,9 +5,16 @@
 cd app && pip install -r requirements.txt -r requirements.dev.txt
 ```
 
-### Format the code
+### Format & lint the code
+This project uses [Ruff](https://docs.astral.sh/ruff/) (enforced by CI).
 ```bash
-cd app && autopep8 --in-place --aggressive --aggressive *.py
+cd app && ruff format .      # apply formatting
+cd app && ruff check .       # lint
+```
+
+### Run the tests
+```bash
+cd app && pytest
 ```
 
 ### Build the Docker image
