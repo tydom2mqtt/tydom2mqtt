@@ -10,6 +10,7 @@ from sensors.Boiler import Boiler
 from sensors.Cover import Cover
 from sensors.Garage import Garage
 from sensors.Light import Light
+from sensors.Plug import Plug
 from sensors.Sensor import Sensor
 from sensors.Switch import Switch
 from sensors.ShHvac import ShHvac
@@ -92,6 +93,11 @@ deviceLightKeywords = [
     "cmdDefect",
     "onPresenceDetected",
     "onDusk",
+]
+
+devicePlugKeywords = [
+    "plugCmd",
+    "energyInstantTotElecP",
 ]
 deviceLightDetailsKeywords = [
     "onFavPos",
@@ -496,6 +502,11 @@ class MessageHandler:
                 device_type[device_unique_id] = "boiler"
                 device_endpoint[device_unique_id] = i["id_endpoint"]
 
+            if i["last_usage"] == "plug":
+                device_name[device_unique_id] = i["name"]
+                device_type[device_unique_id] = "plug"
+                device_endpoint[device_unique_id] = i["id_endpoint"]
+
             if i["last_usage"] == "sensorDFR":
                 device_name[device_unique_id] = i["name"]
                 device_type[device_unique_id] = "smoke"
@@ -600,6 +611,7 @@ class MessageHandler:
                 attr_ukn = {}
                 attr_window = {}
                 attr_light = {}
+                attr_plug = {}
                 attr_gate = {}
                 attr_boiler = {}
                 attr_sh_hvac = {}
@@ -638,6 +650,19 @@ class MessageHandler:
                             attr_light["name"] = print_id
                             attr_light["device_type"] = "light"
                             attr_light[element_name] = element_value
+
+                    if type_of_id == "plug":
+                        if (
+                            element_name in devicePlugKeywords
+                            and element_validity == "upToDate"
+                        ):
+                            attr_plug["device_id"] = device_id
+                            attr_plug["endpoint_id"] = endpoint_id
+                            attr_plug["id"] = str(device_id) + "_" + str(endpoint_id)
+                            attr_plug["plug_name"] = print_id
+                            attr_plug["name"] = print_id
+                            attr_plug["device_type"] = "plug"
+                            attr_plug[element_name] = element_value
 
                     if (
                         type_of_id == "shutter"
@@ -943,6 +968,9 @@ class MessageHandler:
             elif "device_type" in attr_light and attr_light["device_type"] == "light":
                 new_light = Light(tydom_attributes=attr_light, mqtt=self.mqtt_client)
                 await new_light.update()
+            elif "device_type" in attr_plug and attr_plug["device_type"] == "plug":
+                new_plug = Plug(tydom_attributes=attr_plug, mqtt=self.mqtt_client)
+                await new_plug.update()
             elif (
                 "device_type" in attr_boiler and attr_boiler["device_type"] == "climate"
             ):

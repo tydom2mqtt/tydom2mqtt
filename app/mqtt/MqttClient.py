@@ -12,6 +12,7 @@ from sensors.Boiler import Boiler
 from sensors.Cover import Cover
 from sensors.Garage import Garage
 from sensors.Light import Light
+from sensors.Plug import Plug
 from sensors.Switch import Switch
 from sensors.ShHvac import ShHvac
 from sensors.AutomaticDoor import AutomaticDoor
@@ -215,6 +216,21 @@ class MqttClient:
                 device_id=device_id,
                 light_id=endpoint_id,
                 level=str(value),
+            )
+
+        elif "set_plug_state" in str(topic):
+            value = payload.decode()
+            logger.info(
+                "set_plug_state message received (topic=%s, message=%s)", topic, value
+            )
+            get_id = (topic.split("/"))[2]
+            device_id = (get_id.split("_"))[0]
+            endpoint_id = (get_id.split("_"))[1]
+            await Plug.put_plug_state(
+                tydom_client=self.tydom,
+                device_id=device_id,
+                plug_id=endpoint_id,
+                plug_state=str(value),
             )
 
         elif "open_automatic_door" in str(topic):
