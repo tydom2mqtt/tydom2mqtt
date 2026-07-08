@@ -228,8 +228,25 @@ class TydomClient:
         digest_auth = HTTPDigestAuth(self.mac, self.password)
         chal = dict()
         chal["nonce"] = nonce[2].split("=", 1)[1].split('"')[1]
-        chal["realm"] = "ServiceMedia" if self.remote_mode is True else "protected area"
+        # Use the realm advertised by the gateway. The realm is part of
+        # HA1 = MD5(user:realm:password), so it must match exactly (case included).
+        # Recent Tydom firmwares send realm="Protected Area" (capitalized); the
+        # hard-coded lowercase "protected area" breaks the hash -> HTTP 401.
+        realm_default = "ServiceMedia" if self.remote_mode is True else "protected area"
+        try:
+            chal["realm"] = nonce[0].split("realm=", 1)[1].split('"')[1] or realm_default
+        except (IndexError, AttributeError):
+            chal["realm"] = realm_default
         chal["qop"] = "auth"
+        # Echo the opaque value if the gateway provided one. RFC 2617 requires it
+        # to be returned unchanged; recent firmwares reject the auth without it.
+        for part in nonce:
+            if "opaque=" in part:
+                try:
+                    chal["opaque"] = part.split("opaque=", 1)[1].split('"')[1]
+                except IndexError:
+                    pass
+                break
         digest_auth._thread_local.chal = chal
         digest_auth._thread_local.last_nonce = nonce
         digest_auth._thread_local.nonce_count = 1
@@ -239,7 +256,7 @@ class TydomClient:
                 host=self.host, mac=self.mac
             ),
         )
-
+        
     async def notify_alive(self, msg="OK"):
         pass
 
