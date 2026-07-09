@@ -8,3 +8,6 @@ DELTADORE_AUTH_SCOPE = "openid profile offline_access https://deltadoreadb2ciot.
 DELTADORE_API_SITES = (
     "https://prod.iotdeltadore.com/sitesmanagement/api/v1/sites?gateway_mac="
 )
+DELTADORE_SITE_LIST = (
+    "https://prod.iotdeltadore.com/sitesmanagement/api/v1/siteaccesslist"
+)
