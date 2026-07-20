@@ -310,6 +310,11 @@ deviceSmokeKeywords = ["techSmokeDefect"]
 device_name = dict()
 device_endpoint = dict()
 device_type = dict()
+# Per-device_id_endpoint_id capability description, populated from endpoint
+# `metadata` pushes: {unique_id: {attribute_name: enum_values}}
+device_metadata = dict()
+
+garage_gate_usage_types = ("garage_door_horizontal", "garage_door", "gate")
 
 
 class MessageHandler:
@@ -398,6 +403,8 @@ class MessageHandler:
                 msg_type = "msg_config"
             elif "cmetadata" in data:
                 msg_type = "msg_cmetadata"
+            elif "metadata" in data:
+                msg_type = "msg_metadata"
             elif "cdata" in data:
                 msg_type = "msg_cdata"
             elif "id" in first:
@@ -421,6 +428,10 @@ class MessageHandler:
                     elif msg_type == "msg_cmetadata":
                         parsed = json.loads(data)
                         await self.parse_cmeta_data(parsed=parsed)
+
+                    elif msg_type == "msg_metadata":
+                        parsed = json.loads(data)
+                        await self.parse_endpoint_metadata(parsed=parsed)
 
                     elif msg_type == "msg_data":
                         parsed = json.loads(data)
@@ -575,6 +586,67 @@ class MessageHandler:
                                         logger.debug("Add poll device : " + url)
 
         logger.debug("Metadata configuration updated")
+
+    async def parse_endpoint_metadata(self, parsed):
+        # Endpoint capability description push, e.g.:
+        # [{"id": <device_id>, "endpoints": [{"id": <endpoint_id>, "error": 0,
+        #   "metadata": [{"name": "levelCmd", "enum_values": ["TOGGLE"], ...}]}]}]
+        # Distinct from `cmetadata` (config-metadata) handled above.
+        if not isinstance(parsed, list):
+            logger.warning("Unknown metadata message format (%s)", parsed)
+            return
+
+        for i in parsed:
+            device_id = i.get("id")
+            for endpoint in i.get("endpoints", []):
+                if endpoint.get("error") != 0 or "metadata" not in endpoint:
+                    continue
+
+                endpoint_id = endpoint["id"]
+                unique_id = str(endpoint_id) + "_" + str(device_id)
+                capabilities = device_metadata.setdefault(unique_id, {})
+                was_toggle_only = capabilities.get("levelCmd") == ["TOGGLE"]
+
+                for elem in endpoint["metadata"]:
+                    elem_name = elem.get("name")
+                    if elem_name is not None and "enum_values" in elem:
+                        capabilities[elem_name] = elem["enum_values"]
+
+                is_toggle_only = capabilities.get("levelCmd") == ["TOGGLE"]
+                type_of_id = self.get_type_from_id(unique_id)
+
+                if (
+                    is_toggle_only != was_toggle_only
+                    and type_of_id in garage_gate_usage_types
+                ):
+                    await self.republish_garage_discovery(
+                        device_id, endpoint_id, unique_id, type_of_id
+                    )
+
+        logger.debug("Endpoint metadata updated")
+
+    async def republish_garage_discovery(
+        self, device_id, endpoint_id, unique_id, type_of_id
+    ):
+        # Metadata can arrive after the garage/gate entity was already
+        # published with the default ON/OFF/STOP payloads (or before any
+        # state data has been seen at all). Re-publish the retained
+        # discovery config now that the toggle-only determination changed,
+        # without touching state topics (no fresh state data is available
+        # here).
+        name_of_id = self.get_name_from_id(unique_id)
+        print_id = name_of_id if len(name_of_id) != 0 else device_id
+        attr_garage = {
+            "device_id": device_id,
+            "endpoint_id": endpoint_id,
+            "id": str(device_id) + "_" + str(endpoint_id),
+            "cover_name": print_id,
+            "name": print_id,
+            "device_type": "garage",
+            "cover_class": "garage" if type_of_id == "garage_door" else "gate",
+        }
+        garage = Garage(tydom_attributes=attr_garage, mqtt=self.mqtt_client)
+        await garage.setup()
 
     async def parse_devices_data(self, parsed):
         if isinstance(parsed, list):
