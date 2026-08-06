@@ -16,6 +16,7 @@ from sensors.Plug import Plug
 from sensors.Switch import Switch
 from sensors.ShHvac import ShHvac
 from sensors.AutomaticDoor import AutomaticDoor
+from health.HealthState import HealthState
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +47,7 @@ class MqttClient:
         self.mqtt_client = None
         self.home_zone = home_zone
         self.night_zone = night_zone
+        self.health_state = HealthState()
 
     async def connect(self):
         try:
@@ -74,6 +76,7 @@ class MqttClient:
             logger.debug("Subscribing to topics (%s)", tydom_topic)
             client.subscribe("homeassistant/status", qos=0)
             client.subscribe(tydom_topic, qos=0)
+            self.health_state.update_mqtt_status(True)
         except Exception as e:
             logger.info("Mqtt connection error (%s)", e)
 
@@ -294,6 +297,7 @@ class MqttClient:
                 device_id=device_id,
                 boiler_id=endpoint_id,
                 set_hvac_mode=str(value),
+                mqtt_client=self.mqtt_client,
             )
 
         elif "set_thermicLevel" in str(topic):
@@ -384,6 +388,6 @@ class MqttClient:
                 tydom_client=self.tydom, device_id=device_id, boost=value
             )
 
-    @staticmethod
-    def on_disconnect(cmd, packet):
+    def on_disconnect(self, cmd, packet):
         logger.info("Disconnected")
+        self.health_state.update_mqtt_status(False)

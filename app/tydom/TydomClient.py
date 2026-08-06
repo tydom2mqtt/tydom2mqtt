@@ -18,6 +18,7 @@ from .const import (
     DELTADORE_AUTH_GRANT_TYPE,
     MEDIATION_URL,
 )
+from health.HealthState import HealthState
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +64,8 @@ class TydomClient:
 
         self.thermostat_cool_mode_temp_default = int(thermostat_cool_mode_temp_default)
         self.thermostat_heat_mode_temp_default = int(thermostat_heat_mode_temp_default)
+
+        self.health_state = HealthState()
 
         # Set Host, ssl context and prefix for remote or local connection
         if self.host == MEDIATION_URL:
@@ -201,6 +204,7 @@ class TydomClient:
                 ping_timeout=None,
             )
             logger.info("Connected to tydom")
+            self.health_state.update_tydom_status(True)
             return self.connection
         except Exception as e:
             logger.error("Exception when trying to connect with websocket (%s)", e)
@@ -210,6 +214,7 @@ class TydomClient:
         if self.connection is not None:
             logger.info("Disconnecting")
             await self.connection.close()
+            self.health_state.update_tydom_status(False)
             logger.info("Disconnected")
 
     # Generate 16 bytes random key for Sec-WebSocket-Keyand convert it to
@@ -298,6 +303,28 @@ class TydomClient:
         )
         a_bytes = bytes(str_request, "ascii")
         logger.debug("Sending message to tydom (%s %s)", "PUT areas data", body)
+        await self.connection.send(a_bytes)
+        return 0
+
+    async def put_home_hvac_mode(self, mode):
+        """Set the zone-level HVAC mode (STOP / HEATING / COOLING).
+
+        Tells the heat pump which way to run (or stop). Tydom acknowledges
+        with a 200 OK then broadcasts the resulting state to all clients via
+        PUT /devices/data (per-thermostat authorization update) and
+        POST /events/home/hvac.
+        """
+        body = '{"mode":"' + mode + '"}'
+        str_request = (
+            self.cmd_prefix
+            + "PUT /home/hvac/data HTTP/1.1\r\nContent-Length: "
+            + str(len(body))
+            + "\r\nContent-Type: application/json; charset=UTF-8\r\nTransac-Id: 0\r\n\r\n"
+            + body
+            + "\r\n\r\n"
+        )
+        a_bytes = bytes(str_request, "ascii")
+        logger.debug("Sending message to tydom (%s %s)", "PUT home hvac data", body)
         await self.connection.send(a_bytes)
         return 0
 

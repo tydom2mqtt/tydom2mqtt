@@ -10,6 +10,8 @@ from configuration.Configuration import Configuration
 from mqtt.MqttClient import MqttClient
 from tydom.TydomClient import TydomClient
 from tydom.MessageHandler import MessageHandler
+from health.HealthState import HealthState
+from health.HealthServer import HealthServer
 
 # Setup logger configuration
 logging.basicConfig(level="INFO", format="%(asctime)s - %(message)s")
@@ -36,6 +38,18 @@ if configuration.log_level != "DEBUG":
     logging.getLogger("gmqtt").setLevel(logging.WARNING)
     logging.getLogger("websockets").setLevel(logging.WARNING)
 
+# Initialize health state singleton
+health_state = HealthState()
+# Derive the health timeouts from the polling interval (see HealthState).
+health_state.set_timeouts_from_polling_interval(
+    int(configuration.tydom_polling_interval)
+)
+
+# Initialize health server if enabled
+health_server = None
+if configuration.health_enabled:
+    health_server = HealthServer(port=configuration.health_port)
+
 
 # Listen to tydom events.
 async def listen_tydom():
@@ -45,7 +59,19 @@ async def listen_tydom():
             await tydom_client.setup()
             while True:
                 try:
-                    incoming_bytes_str = await tydom_client.connection.recv()
+                    try:
+                        incoming_bytes_str = await asyncio.wait_for(
+                            tydom_client.connection.recv(),
+                            timeout=tydom_client.polling_interval,
+                        )
+                    except asyncio.TimeoutError:
+                        # No message within the window: the task is still alive
+                        # and listening. Refresh the heartbeat (liveness) without
+                        # touching the message-freshness clock, then keep waiting.
+                        health_state.update_task_heartbeat("listen_tydom")
+                        continue
+                    health_state.update_task_heartbeat("listen_tydom")
+                    health_state.update_tydom_message_time()
                     message_handler = MessageHandler(
                         incoming_bytes=incoming_bytes_str,
                         tydom_client=tydom_client,
@@ -73,6 +99,9 @@ async def poll_device_tydom():
         try:
             await asyncio.sleep(tydom_client.polling_interval)
             await tydom_client.post_refresh()
+            # Heartbeat after a successful refresh so a hung post_refresh()
+            # goes stale and is detected instead of looking alive for a cycle.
+            health_state.update_task_heartbeat("poll_device_tydom")
         except Exception as e:
             logger.warning("poll_device_tydom error : %s", e)
             break
@@ -108,6 +137,10 @@ async def shutdown(signal, loop):
     logging.info("Cancelling running tasks")
 
     try:
+        # Stop health server
+        if health_server is not None:
+            await health_server.stop()
+
         # Close connections
         await tydom_client.disconnect()
 
@@ -127,6 +160,12 @@ def main():
     signals = (signal.SIGHUP, signal.SIGTERM, signal.SIGINT)
     for s in signals:
         loop.add_signal_handler(s, lambda s=s: asyncio.create_task(shutdown(s, loop)))
+
+    # Start the health server synchronously so a bind failure (e.g. port in
+    # use) surfaces immediately and stops startup, instead of being lost in a
+    # fire-and-forget task while the container reports itself unhealthy.
+    if health_server is not None:
+        loop.run_until_complete(health_server.start())
 
     loop.create_task(mqtt_client.connect())
     loop.create_task(listen_tydom())

@@ -1,0 +1,23 @@
+name: 🏷️ Semantic PR
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  pull-requests: read
+
+on:
+  pull_request:
+    # `edited` re-runs the check when the PR title (or body/base) changes,
+    # `synchronize` on new commits, plus the open/reopen events.
+    types:
+      - opened
+      - reopened
+      - edited
+      - synchronize
+
+jobs:
+  semantic-pr:
+    name: 🏷️ PR is semantic
+    uses: VeryGoodOpenSource/very_good_workflows/.github/workflows/semantic_pull_request.yml@v1

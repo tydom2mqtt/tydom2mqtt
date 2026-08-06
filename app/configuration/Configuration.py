@@ -27,6 +27,8 @@ DELTADORE_PASSWORD = "DELTADORE_PASSWORD"
 THERMOSTAT_CUSTOM_PRESETS = "THERMOSTAT_CUSTOM_PRESETS"
 THERMOSTAT_COOL_MODE_TEMP_DEFAULT = "THERMOSTAT_COOL_MODE_TEMP_DEFAULT"
 THERMOSTAT_HEAT_MODE_TEMP_DEFAULT = "THERMOSTAT_HEAT_MODE_TEMP_DEFAULT"
+HEALTH_ENABLED = "HEALTH_ENABLED"
+HEALTH_PORT = "HEALTH_PORT"
 
 
 @dataclass
@@ -47,13 +49,15 @@ class Configuration:
     thermostat_cool_mode_temp_default = int
     thermostat_heat_mode_temp_default = int
     tydom_polling_interval = int
+    health_enabled = bool
+    health_port = int
 
     def __init__(self):
         self.log_level = os.getenv(LOG_LEVEL, "INFO").upper()
         self.mqtt_host = os.getenv(MQTT_HOST, "localhost")
         self.mqtt_password = os.getenv(MQTT_PASSWORD, None)
         self.mqtt_port = os.getenv(MQTT_PORT, 1883)
-        self.mqtt_ssl = os.getenv(MQTT_SSL, False)
+        self.mqtt_ssl = self._parse_bool(MQTT_SSL, os.getenv(MQTT_SSL, "false"), False)
         self.mqtt_user = os.getenv(MQTT_USER, None)
         self.tydom_alarm_home_zone = os.getenv(TYDOM_ALARM_HOME_ZONE, 1)
         self.tydom_alarm_night_zone = os.getenv(TYDOM_ALARM_NIGHT_ZONE, 2)
@@ -71,6 +75,10 @@ class Configuration:
         self.thermostat_heat_mode_temp_default = os.getenv(
             THERMOSTAT_HEAT_MODE_TEMP_DEFAULT, 16
         )
+        self.health_enabled = self._parse_bool(
+            HEALTH_ENABLED, os.getenv(HEALTH_ENABLED, "true"), True
+        )
+        self.health_port = int(os.getenv(HEALTH_PORT, 8080))
 
     @staticmethod
     def load():
@@ -159,7 +167,9 @@ class Configuration:
                         self.mqtt_port = data[MQTT_PORT]
 
                     if MQTT_SSL in data and data[MQTT_SSL] != "":
-                        self.mqtt_ssl = data[MQTT_SSL]
+                        self.mqtt_ssl = self._parse_bool(
+                            MQTT_SSL, data[MQTT_SSL], self.mqtt_ssl
+                        )
 
                 except Exception as e:
                     logger.error("Parsing error %s", e)
@@ -210,6 +220,29 @@ class Configuration:
 
     def to_json(self):
         return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, indent=4)
+
+    @staticmethod
+    def _parse_bool(name, value, default):
+        """Parse a configuration value into a bool.
+
+        Accepts the same truthy/falsy tokens for every boolean setting so the
+        env-var and Hass.io paths behave identically. An unrecognized, non-empty
+        value is not silently coerced: it is logged and falls back to ``default``
+        so a typo (e.g. ``MQTT_SSL=ture``) is debuggable instead of quietly
+        disabling the feature.
+        """
+        normalized = str(value).strip().lower()
+        if normalized in ("true", "1", "yes"):
+            return True
+        if normalized in ("false", "0", "no", ""):
+            return False
+        logger.warning(
+            "Unrecognized boolean value for %s: %r; defaulting to %s",
+            name,
+            value,
+            default,
+        )
+        return default
 
     @staticmethod
     def mask_value(value, nb=1, char="*"):
