@@ -4,6 +4,7 @@ import logging
 import os
 import sys
 from dataclasses import dataclass
+from configuration.PasswordStore import PasswordStore
 from tydom.TydomClient import TydomClient
 
 logger = logging.getLogger(__name__)
@@ -22,6 +23,8 @@ TYDOM_IP = "TYDOM_IP"
 TYDOM_MAC = "TYDOM_MAC"
 TYDOM_PASSWORD = "TYDOM_PASSWORD"
 TYDOM_POLLING_INTERVAL = "TYDOM_POLLING_INTERVAL"
+TYDOM_STATE_DIR = "TYDOM_STATE_DIR"
+TYDOM_PAIRING_TIMEOUT = "TYDOM_PAIRING_TIMEOUT"
 DELTADORE_LOGIN = "DELTADORE_LOGIN"
 DELTADORE_PASSWORD = "DELTADORE_PASSWORD"
 THERMOSTAT_CUSTOM_PRESETS = "THERMOSTAT_CUSTOM_PRESETS"
@@ -66,6 +69,14 @@ class Configuration:
         self.tydom_mac = os.getenv(TYDOM_MAC, None)
         self.tydom_password = os.getenv(TYDOM_PASSWORD, None)
         self.tydom_polling_interval = os.getenv(TYDOM_POLLING_INTERVAL, 300)
+        self.tydom_state_dir = os.getenv(TYDOM_STATE_DIR, "/data")
+        self.tydom_pairing_timeout = os.getenv(TYDOM_PAIRING_TIMEOUT, 180)
+        # Remember whether the user supplied a password, so that neither the
+        # cloud lookup nor the stored value silently overrides their choice.
+        self.tydom_password_is_explicit = (
+            self.tydom_password is not None and self.tydom_password != ""
+        )
+        self.password_store = PasswordStore(self.tydom_state_dir)
         self.deltadore_login = os.getenv(DELTADORE_LOGIN, None)
         self.deltadore_password = os.getenv(DELTADORE_PASSWORD, None)
         self.thermostat_custom_presets = os.getenv(THERMOSTAT_CUSTOM_PRESETS, None)
@@ -85,8 +96,29 @@ class Configuration:
         configuration = Configuration()
         configuration.override_configuration_for_hassio()
         configuration.override_configuration_with_deltadore()
+        configuration.resolve_local_password()
         configuration.validate()
         return configuration
+
+    def is_local_mode(self):
+        return self.tydom_ip != "mediation.tydom.com"
+
+    def resolve_local_password(self):
+        """Reuse the local password kept from a previous pairing, if any.
+
+        An explicitly configured password always wins, so this never
+        overrides what the user asked for. When nothing is available the
+        password stays empty and the client pairs with the hub at startup.
+        """
+        if not self.is_local_mode():
+            return
+
+        if self.tydom_password is not None and self.tydom_password != "":
+            return
+
+        stored = self.password_store.read()
+        if stored is not None:
+            self.tydom_password = stored
 
     def override_configuration_for_hassio(self):
         hassio_options_file_path = "/data/options.json"
@@ -116,6 +148,12 @@ class Configuration:
                         and data[TYDOM_POLLING_INTERVAL] != ""
                     ):
                         self.tydom_polling_interval = int(data[TYDOM_POLLING_INTERVAL])
+
+                    if (
+                        TYDOM_PAIRING_TIMEOUT in data
+                        and data[TYDOM_PAIRING_TIMEOUT] != ""
+                    ):
+                        self.tydom_pairing_timeout = int(data[TYDOM_PAIRING_TIMEOUT])
 
                     if DELTADORE_LOGIN in data and data[DELTADORE_LOGIN] != "":
                         self.deltadore_login = data[DELTADORE_LOGIN]
@@ -178,16 +216,37 @@ class Configuration:
             logger.debug("Hassio environment not detected")
 
     def override_configuration_with_deltadore(self):
-        if (
-            self.deltadore_login is not None
-            and self.deltadore_login != ""
-            and self.deltadore_password is not None
-            and self.deltadore_password != ""
-        ):
-            tydom_password = TydomClient.getTydomCredentials(
-                self.deltadore_login, self.deltadore_password, self.tydom_mac
+        if self.deltadore_login is None or self.deltadore_login == "":
+            return
+        if self.deltadore_password is None or self.deltadore_password == "":
+            return
+
+        if self.is_local_mode():
+            # The cloud hands out the gateway's *remote* password, which a
+            # local hub rejects. Overriding here would break a working setup.
+            logger.warning(
+                "Delta Dore cloud credentials are set but TYDOM_IP points at "
+                "a local gateway (%s). The cloud password is a different "
+                "secret and does not authenticate locally, so it is ignored. "
+                "Leave TYDOM_PASSWORD empty to pair with the hub's button.",
+                self.tydom_ip,
             )
-            self.tydom_password = tydom_password
+            return
+
+        tydom_password = TydomClient.getTydomCredentials(
+            self.deltadore_login, self.deltadore_password, self.tydom_mac
+        )
+
+        if tydom_password is None or tydom_password == "":
+            # Losing a perfectly good password because the cloud lookup failed
+            # would fail validation later with a misleading message.
+            logger.warning(
+                "Could not retrieve the gateway password from Delta Dore. "
+                "Keeping the configured password, if any."
+            )
+            return
+
+        self.tydom_password = tydom_password
 
     def validate(self):
         configuration_to_print = copy.copy(self)
@@ -213,8 +272,16 @@ class Configuration:
             sys.exit(1)
 
         if self.tydom_password is None or self.tydom_password == "":
-            logger.error("Tydom password must be defined")
-            sys.exit(1)
+            if self.is_local_mode():
+                # A local hub gives out its own password once its button is
+                # pressed, so this is a normal first-run state, not an error.
+                logger.info(
+                    "No Tydom password configured; will pair with the local "
+                    "hub at startup (its button will have to be pressed once)"
+                )
+            else:
+                logger.error("Tydom password must be defined")
+                sys.exit(1)
 
         logger.info("The configuration is valid")
 

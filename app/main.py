@@ -117,6 +117,8 @@ tydom_client = TydomClient(
     thermostat_heat_mode_temp_default=configuration.thermostat_heat_mode_temp_default,
     alarm_pin=configuration.tydom_alarm_pin,
     thermostat_custom_presets=configuration.thermostat_custom_presets,
+    password_store=configuration.password_store,
+    pairing_timeout=configuration.tydom_pairing_timeout,
 )
 
 # Create mqtt client

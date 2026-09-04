@@ -34,6 +34,10 @@ docker run -d --name tydom2mqtt \
 ```
 <!-- tabs:end -->
 
+?> Connecting to a hub on your local network? You don't need `TYDOM_PASSWORD`
+at all: leave it out and press the button on the hub when asked, see
+[the configuration options](/configuration/) for details.
+
 ?> [Please find here all the configuration options.](/configuration/)
 
 !> Are you a Home-Assistant user? \
