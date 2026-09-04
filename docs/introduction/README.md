@@ -21,18 +21,23 @@ services:
     container_name: tydom2mqtt
     environment:
       - TYDOM_MAC=001A25XXXXXX
-      - TYDOM_PASSWORD=azerty123456789
       - TYDOM_IP=192.168.1.33
+    volumes:
+      - ./tydom-data:/data
 ```
 #### **Docker**
 ```bash
 docker run -d --name tydom2mqtt \
   -e TYDOM_MAC="001A25XXXXXX" \
-  -e TYDOM_PASSWORD="azerty123456789" \
-  -e TYDOM_IP="192.168.1.33" \  
+  -e TYDOM_IP="192.168.1.33" \
+  -v "$(pwd)/tydom-data:/data" \
   ghcr.io/tydom2mqtt/tydom2mqtt
 ```
 <!-- tabs:end -->
+
+?> Connecting to a hub on your local network? You don't need `TYDOM_PASSWORD`
+at all: leave it out and press the button on the hub when asked, see
+[the configuration options](/configuration/) for details.
 
 ?> [Please find here all the configuration options.](/configuration/)
 

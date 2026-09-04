@@ -24,5 +24,5 @@ docker build -t tydom2mqtt .
 
 ### Run the Docker image
 ```bash
-docker run -it --rm -e TYDOM_MAC="001A25123456" -e TYDOM_PASSWORD="secret" tydom2mqtt
+docker run -it --rm -e TYDOM_MAC="001A25123456" -e TYDOM_IP="192.168.1.33" -v "$(pwd)/tydom-data:/data" tydom2mqtt
 ```
