@@ -38,6 +38,10 @@ docker run -d --name tydom2mqtt \
 
 !> Are you a Home-Assistant user? \
 So maybe take a look at the [Hass.io add-on version](/hass/)!
+
+?> Using [Gladys Assistant](https://gladysassistant.com)? \
+`tydom2mqtt` is compatible with Gladys through the [gladys-tydom integration](/gladys-assistant/).
+
 ## Contact & Support
 
 - Create a [GitHub issue](https://github.com/tydom2mqtt/tydom2mqtt/issues) for bug reports, feature requests, or questions

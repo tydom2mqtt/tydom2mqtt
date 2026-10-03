@@ -1,5 +1,6 @@
 - [Introduction](introduction/)
 - [Configuration](configuration/)
 - [Home-Assistant integration](hass/)
+- [Gladys Assistant integration](gladys-assistant/)
 - [FAQ](faq/)  
 - [Changelog](changelog/)

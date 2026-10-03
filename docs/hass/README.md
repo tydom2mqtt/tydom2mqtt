@@ -30,7 +30,7 @@ Some user names are reserved (e.g. `homeassistant`) and should not be used (you 
 
 To create a new user, go to **_Settings_** -> **_People_** then **_Users Tab_**
 
-![mqqt-user](../hass/mqtt-user.png)
+![mqtt-user](../hass/mqtt-user.png)
 
 ### Install mosquito
 
@@ -72,7 +72,7 @@ This is an MQTT client that will connect to your mosquitto broker to receive mqt
 
 ### Install tydom2mqtt
 
-`tydom2mqqt` is available via an extra addon repository.
+`tydom2mqtt` is available via an extra addon repository.
 
 To add the repository to your Home-Assistant, just [follow the documentation here](https://github.com/tydom2mqtt/hassio-addons/tree/main).
 
@@ -175,7 +175,7 @@ The interesting part starts around line 70; you should see connection details to
 
 ![mqtt-access-debug](../hass/mqtt-access-debug.png)
 
-![mqqt-debug-file](../hass/mqqt-debug-file.png)
+![mqtt-debug-file](../hass/mqtt-debug-file.png)
 
 #### Troubleshooting Mqtt messages
 
