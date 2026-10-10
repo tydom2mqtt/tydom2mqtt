@@ -3,6 +3,7 @@ import http.client
 import json
 import logging
 import os
+import re
 import ssl
 import sys
 
@@ -173,15 +174,10 @@ class TydomClient:
 
         # Get authentication
         websocket_headers = {}
-        try:
-            # Local installations are unauthenticated but we don't *know* that for certain
-            # so we'll EAFP, try to use the header and fallback if we're
-            # unable.
-            nonce = res.headers["WWW-Authenticate"].split(",", 3)
-            # Build websocket headers
-            websocket_headers = {"Authorization": self.build_digest_headers(nonce)}
-        except AttributeError:
-            pass
+        # Local installations may be unauthenticated: no challenge, no header.
+        challenge = res.headers.get("WWW-Authenticate")
+        if challenge:
+            websocket_headers = {"Authorization": self.build_digest_headers(challenge)}
 
         logger.debug("Upgrading http connection to websocket....")
 
@@ -223,15 +219,27 @@ class TydomClient:
     def generate_random_key():
         return base64.b64encode(os.urandom(16))
 
+    @staticmethod
+    def parse_digest_challenge(header):
+        """Parse a WWW-Authenticate Digest header into a dict (realm, nonce, qop, opaque...)."""
+        return {
+            k: (quoted or bare)
+            for k, quoted, bare in re.findall(r'(\w+)=(?:"([^"]*)"|([^,\s]+))', header)
+        }
+
     # Build the headers of Digest Authentication
-    def build_digest_headers(self, nonce):
+    def build_digest_headers(self, challenge):
         digest_auth = HTTPDigestAuth(self.mac, self.password)
-        chal = dict()
-        chal["nonce"] = nonce[2].split("=", 1)[1].split('"')[1]
-        chal["realm"] = "ServiceMedia" if self.remote_mode is True else "protected area"
+        chal = self.parse_digest_challenge(challenge)
+        # Use the realm announced by the hub (its case changed on recent firmwares),
+        # keep the previous hardcoded values as fallback.
+        chal.setdefault(
+            "realm", "ServiceMedia" if self.remote_mode is True else "protected area"
+        )
         chal["qop"] = "auth"
         digest_auth._thread_local.chal = chal
-        digest_auth._thread_local.last_nonce = nonce
+        # Must differ from the nonce so that requests starts at nc=00000001
+        digest_auth._thread_local.last_nonce = None
         digest_auth._thread_local.nonce_count = 1
         return digest_auth.build_digest_header(
             "GET",

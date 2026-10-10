@@ -107,6 +107,25 @@ async def poll_device_tydom():
             break
 
 
+# Keep the websocket alive: recent Tydom firmwares close the session after
+# ~60s without any message from the client, which is shorter than the default
+# polling interval (300s).
+KEEPALIVE_INTERVAL = 30
+
+
+async def keepalive_tydom():
+    while True:
+        await asyncio.sleep(KEEPALIVE_INTERVAL)
+        try:
+            if tydom_client.connection is not None:
+                await tydom_client.ping()
+        except websockets.ConnectionClosed:
+            # listen_tydom() notices the closed connection and reconnects.
+            logger.debug("keepalive skipped: connection closed")
+        except Exception as e:
+            logger.warning("keepalive ping failed: %s", e)
+
+
 # Create tydom client
 tydom_client = TydomClient(
     mac=configuration.tydom_mac,
@@ -170,6 +189,7 @@ def main():
     loop.create_task(mqtt_client.connect())
     loop.create_task(listen_tydom())
     loop.create_task(poll_device_tydom())
+    loop.create_task(keepalive_tydom())
     loop.run_forever()
 
 

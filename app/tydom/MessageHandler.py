@@ -393,6 +393,12 @@ class MessageHandler:
         msg_type = None
         first = str(data[:40])
 
+        # An empty JSON list/object is a valid answer (e.g. GET /areas/data when
+        # no area is configured): nothing to parse, nothing to warn about.
+        if isinstance(data, str) and data.strip() in ("[]", "{}"):
+            logger.debug("Empty JSON message received (%s)", data.strip())
+            return
+
         if data != "":
             if "id_catalog" in data:
                 msg_type = "msg_config"
