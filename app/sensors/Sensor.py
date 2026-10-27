@@ -10,6 +10,17 @@ binary_sensor_topic = "binary_sensor/tydom/#"
 binary_sensor_config_topic = "homeassistant/binary_sensor/tydom/{id}/config"
 binary_sensor_json_attributes_topic = "binary_sensor/tydom/{id}/state"
 
+# Binary Tydom health flags and their Home Assistant device class
+binary_diagnostic_classes = {
+    "battDefect": "battery",
+    "thermicDefect": "problem",
+    "obstacleDefect": "problem",
+    "calibrationDefect": "problem",
+    "cmdDefect": "problem",
+    "loadDefect": "problem",
+    "techSmokeDefect": "problem",
+}
+
 
 class Sensor:
     def __init__(self, elem_name, tydom_attributes_payload, mqtt=None):
@@ -25,18 +36,36 @@ class Sensor:
 
         # extracted from json, but it will make sensor not in payload to be
         # considered offline....
-        self.parent_device_id = str(tydom_attributes_payload["id"])
-        self.parent_name = str(tydom_attributes_payload["name"])
+        # An opening detector may be published on its window group's device
+        self.attached_to_parent = "parent_id" in tydom_attributes_payload
+        self.parent_device_id = str(
+            tydom_attributes_payload.get("parent_id", tydom_attributes_payload["id"])
+        )
+        self.parent_name = str(
+            tydom_attributes_payload.get(
+                "parent_name", tydom_attributes_payload["name"]
+            )
+        )
         self.id = elem_name + "_tydom_" + str(tydom_attributes_payload["id"])
-        self.name = elem_name
-        if "device_class" in tydom_attributes_payload.keys():
-            self.device_class = tydom_attributes_payload["device_class"]
+        # Several detectors share the window device: prefix with their name
+        member_name = tydom_attributes_payload.get("member_name")
+        self.name = f"{member_name} {elem_name}" if member_name else elem_name
+        self.entity_category = None
 
-        if "state_class" in tydom_attributes_payload.keys():
-            self.state_class = tydom_attributes_payload["state_class"]
+        # Per-element metadata wins over the device-wide one, so a device
+        # publishing several elements doesn't share one class / unit
+        meta = tydom_attributes_payload.get("element_meta", {}).get(elem_name)
+        if meta is None:
+            meta = tydom_attributes_payload
 
-        if "unit_of_measurement" in tydom_attributes_payload.keys():
-            self.unit_of_measurement = tydom_attributes_payload["unit_of_measurement"]
+        if "device_class" in meta.keys():
+            self.device_class = meta["device_class"]
+
+        if "state_class" in meta.keys():
+            self.state_class = meta["state_class"]
+
+        if "unit_of_measurement" in meta.keys():
+            self.unit_of_measurement = meta["unit_of_measurement"]
         else:
             # Fallback for known sensor types that should have units
             self.unit_of_measurement = self._get_default_unit_for_sensor(elem_name)
@@ -45,10 +74,7 @@ class Sensor:
         self.binary = False
 
         # Check if this should be a binary sensor (no units and boolean-like values)
-        has_unit = (
-            "unit_of_measurement" in tydom_attributes_payload.keys()
-            or self.unit_of_measurement is not None
-        )
+        has_unit = self.unit_of_measurement is not None
 
         if not has_unit and (
             self.elem_value in ["0", "1", "true", "false", "True", "False", "ON", "OFF"]
@@ -71,6 +97,11 @@ class Sensor:
                 id=self.id
             )
             self.config_topic = binary_sensor_config_topic.format(id=self.id)
+
+            # Health / defect flags: proper class, kept out of main dashboards
+            if elem_name in binary_diagnostic_classes:
+                self.device_class = binary_diagnostic_classes[elem_name]
+                self.entity_category = "diagnostic"
         else:
             self.json_attributes_topic = sensor_json_attributes_topic.format(id=self.id)
             self.config_topic = sensor_config_topic.format(id=self.id)
@@ -139,7 +170,7 @@ class Sensor:
         self.device = {
             "manufacturer": "Delta Dore",
             "identifiers": self.parent_device_id,
-            "model": "Sensor",
+            "model": "Window" if self.attached_to_parent else "Sensor",
             "name": self.parent_name,
         }
 
@@ -159,6 +190,9 @@ class Sensor:
                 self.config["unit_of_measurement"] = self.unit_of_measurement
         except AttributeError:
             pass
+
+        if self.entity_category is not None:
+            self.config["entity_category"] = self.entity_category
 
         self.config["device"] = self.device
         self.config["state_topic"] = self.json_attributes_topic

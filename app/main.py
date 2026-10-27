@@ -107,6 +107,23 @@ async def poll_device_tydom():
             break
 
 
+# Periodically re-read the Tydom configuration so devices added to the
+# gateway after startup are discovered without restarting the bridge.
+async def refresh_config_tydom():
+    interval = configuration.tydom_config_refresh_interval
+    if interval <= 0:
+        logger.info("Tydom configuration refresh disabled")
+        return
+    while True:
+        await asyncio.sleep(interval)
+        try:
+            logger.info("Refreshing Tydom configuration")
+            await tydom_client.get_data()
+        except Exception as e:
+            # The websocket may be reconnecting: retry on the next cycle.
+            logger.warning("refresh_config_tydom error : %s", e)
+
+
 # Create tydom client
 tydom_client = TydomClient(
     mac=configuration.tydom_mac,
@@ -170,6 +187,7 @@ def main():
     loop.create_task(mqtt_client.connect())
     loop.create_task(listen_tydom())
     loop.create_task(poll_device_tydom())
+    loop.create_task(refresh_config_tydom())
     loop.run_forever()
 
 

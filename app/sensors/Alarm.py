@@ -38,13 +38,14 @@ class Alarm:
             "device": self.device,
             "command_topic": alarm_command_topic.format(id=self.id),
             "state_topic": alarm_state_topic.format(id=self.id),
-            "code_arm_required": "false",
+            # The Tydom PIN is sent to the gateway by tydom2mqtt itself, so
+            # Home Assistant must not ask for (nor validate) a code. Never
+            # publish `"code": null`: HA rejects the whole discovery payload.
+            "code_arm_required": False,
+            "code_disarm_required": False,
+            "code_trigger_required": False,
         }
         self.config_alarm_topic = alarm_config_topic.format(id=self.id)
-
-        if self.alarm_pin is None:
-            self.config["code"] = self.alarm_pin
-            self.config["code_arm_required"] = "true"
 
         self.config["json_attributes_topic"] = alarm_attributes_topic.format(id=self.id)
 

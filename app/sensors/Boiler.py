@@ -386,7 +386,7 @@ class Boiler:
                 device_id,
                 boiler_id,
                 "setpoint",
-                str(tydom_client.thermostat_heat_mode_temp_default),
+                str(tydom_client.thermostat_cool_mode_temp_default),
             )
             if mqtt_client is not None:
                 mqtt_client.publish(
@@ -401,7 +401,7 @@ class Boiler:
                 device_id,
                 boiler_id,
                 "setpoint",
-                str(tydom_client.thermostat_cool_mode_temp_default),
+                str(tydom_client.thermostat_heat_mode_temp_default),
             )
             if mqtt_client is not None:
                 mqtt_client.publish(

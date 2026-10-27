@@ -86,7 +86,8 @@ Then you can install `tydom2mqtt`.
 
 ![tydom2mqtt-config](../hass/tydom2mqtt-config.png)
 
-?> Mqtt broker host is `homeassistant`. \
+?> With the official Mosquitto broker add-on, the Mqtt broker host is `core-mosquitto`
+(`homeassistant` usually works too). \
 (as you run this add-on as an independent container, `localhost` won't work)
 
 ?> Other configuration entries are pretty self-explanatory.
@@ -101,7 +102,13 @@ Older Tydom gateways accept to connect without password, newer don't. \
 Some people report that using the last 6 digits of the MAC address works, so others don't. \
 Here is a (not simple but feasible) [`tutorial to get your tydom password`](https://community.home-assistant.io/t/integrating-new-2023-tydom-deltadore-x3d-zigbee-gateway-with-home-assistant-solved/537503).
 
-?> A bug requires you to setup an Alarm PIN even if you don't have one; any 6 digits number will do the trick.
+?> If you don't know your Tydom password, fill `DELTADORE_LOGIN` / `DELTADORE_PASSWORD` (your Tydom app account):
+the password is then fetched automatically from Delta Dore.
+
+?> `TYDOM_ALARM_PIN` is only needed to arm / disarm a Tydom alarm from Home Assistant.
+
+?> `THERMOSTAT_CUSTOM_PRESETS` can be set from the add-on options as a JSON string,
+e.g. `{"ECO": "17", "COMFORT": "20"}` (see [configuration](/configuration/)).
 
 ### Restart tydom2mqtt
 

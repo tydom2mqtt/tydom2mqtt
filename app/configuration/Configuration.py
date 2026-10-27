@@ -22,6 +22,7 @@ TYDOM_IP = "TYDOM_IP"
 TYDOM_MAC = "TYDOM_MAC"
 TYDOM_PASSWORD = "TYDOM_PASSWORD"
 TYDOM_POLLING_INTERVAL = "TYDOM_POLLING_INTERVAL"
+TYDOM_CONFIG_REFRESH_INTERVAL = "TYDOM_CONFIG_REFRESH_INTERVAL"
 DELTADORE_LOGIN = "DELTADORE_LOGIN"
 DELTADORE_PASSWORD = "DELTADORE_PASSWORD"
 THERMOSTAT_CUSTOM_PRESETS = "THERMOSTAT_CUSTOM_PRESETS"
@@ -49,6 +50,7 @@ class Configuration:
     thermostat_cool_mode_temp_default = int
     thermostat_heat_mode_temp_default = int
     tydom_polling_interval = int
+    tydom_config_refresh_interval = int
     health_enabled = bool
     health_port = int
 
@@ -66,6 +68,9 @@ class Configuration:
         self.tydom_mac = os.getenv(TYDOM_MAC, None)
         self.tydom_password = os.getenv(TYDOM_PASSWORD, None)
         self.tydom_polling_interval = os.getenv(TYDOM_POLLING_INTERVAL, 300)
+        self.tydom_config_refresh_interval = int(
+            os.getenv(TYDOM_CONFIG_REFRESH_INTERVAL, 3600)
+        )
         self.deltadore_login = os.getenv(DELTADORE_LOGIN, None)
         self.deltadore_password = os.getenv(DELTADORE_PASSWORD, None)
         self.thermostat_custom_presets = os.getenv(THERMOSTAT_CUSTOM_PRESETS, None)
@@ -117,6 +122,14 @@ class Configuration:
                     ):
                         self.tydom_polling_interval = int(data[TYDOM_POLLING_INTERVAL])
 
+                    if (
+                        TYDOM_CONFIG_REFRESH_INTERVAL in data
+                        and data[TYDOM_CONFIG_REFRESH_INTERVAL] != ""
+                    ):
+                        self.tydom_config_refresh_interval = int(
+                            data[TYDOM_CONFIG_REFRESH_INTERVAL]
+                        )
+
                     if DELTADORE_LOGIN in data and data[DELTADORE_LOGIN] != "":
                         self.deltadore_login = data[DELTADORE_LOGIN]
 
@@ -153,6 +166,16 @@ class Configuration:
                         self.thermostat_heat_mode_temp_default = data[
                             THERMOSTAT_HEAT_MODE_TEMP_DEFAULT
                         ]
+
+                    if (
+                        THERMOSTAT_CUSTOM_PRESETS in data
+                        and data[THERMOSTAT_CUSTOM_PRESETS] != ""
+                    ):
+                        presets = data[THERMOSTAT_CUSTOM_PRESETS]
+                        # TydomClient expects a JSON string, as with the env var
+                        self.thermostat_custom_presets = (
+                            presets if isinstance(presets, str) else json.dumps(presets)
+                        )
 
                     if MQTT_HOST in data and data[MQTT_HOST] != "":
                         self.mqtt_host = data[MQTT_HOST]

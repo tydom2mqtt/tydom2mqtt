@@ -244,7 +244,10 @@ class TydomClient:
         pass
 
     def add_poll_device_url(self, url):
-        self.poll_device_urls.append(url)
+        # /devices/cmeta is parsed again on every reconnect and config refresh:
+        # skip known URLs so the poll list does not grow on each pass.
+        if url not in self.poll_device_urls:
+            self.poll_device_urls.append(url)
 
     # Send Generic  message
     async def send_message(self, method, msg):
@@ -463,8 +466,16 @@ class TydomClient:
         req = "GET"
         await self.send_message(method=req, msg=msg_type)
 
+    # Members of the Tydom groups (e.g. the opening detectors of a window)
+    async def get_groups_file(self):
+        msg_type = "/groups/file"
+        req = "GET"
+        await self.send_message(method=req, msg=msg_type)
+
     async def get_data(self):
         await self.get_configs_file()
+        # Before devices data, so detectors are published in their window group
+        await self.get_groups_file()
         await self.get_devices_cmeta()
         await self.get_devices_data()
         await self.get_areas_data()

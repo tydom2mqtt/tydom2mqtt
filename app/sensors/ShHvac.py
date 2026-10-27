@@ -44,7 +44,7 @@ class ShHvac:
             "name": None,  # set an MQTT entity's name to None to mark it as the main feature of a device
             "unique_id": self.id,
             "device": self.device,
-            "temperature_unit ": "C",
+            "temperature_unit": "C",
             # from what we can do in the android app,
             # it seems we can only shut down the whole heating system, not just one heater,
             # so the only mode we can use is heat, no 'off' mode
