@@ -1186,7 +1186,9 @@ class MessageHandler:
                 parsed = json.loads(body)
                 return json.dumps(parsed)
             except json.JSONDecodeError as e:
-                logger.error("JSON decode error (non-chunked) body=%s error=%s", body, e)
+                logger.error(
+                    "JSON decode error (non-chunked) body=%s error=%s", body, e
+                )
                 raise
 
         # Chunked decoding
@@ -1212,7 +1214,9 @@ class MessageHandler:
                 chunk_size = int(size_str, 16)
             except ValueError:
                 # Not a proper chunk size -> treat remainder as body attempt
-                logger.debug("Unexpected chunk size line '%s', abort de-chunking", size_line)
+                logger.debug(
+                    "Unexpected chunk size line '%s', abort de-chunking", size_line
+                )
                 assembled.append(body_part[idx:])
                 break
             chunk = body_part[idx : idx + chunk_size]

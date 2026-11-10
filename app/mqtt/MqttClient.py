@@ -253,7 +253,9 @@ class MqttClient:
             # never log the code
             logger.info(
                 "set_alarm_state message received (topic=%s, action=%s, code=%s)",
-                topic, action, "provided" if code else "none",
+                topic,
+                action,
+                "provided" if code else "none",
             )
             await Alarm.put_alarm_state(
                 tydom_client=self.tydom,

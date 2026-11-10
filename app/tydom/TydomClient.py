@@ -328,7 +328,9 @@ class TydomClient:
         await self.connection.send(a_bytes)
         return 0
 
-    async def put_alarm_cdata(self, device_id, alarm_id=None, value=None, zone_id=None, pin=None):
+    async def put_alarm_cdata(
+        self, device_id, alarm_id=None, value=None, zone_id=None, pin=None
+    ):
         # Credits to @mgcrea on github !
         # AWAY # "PUT /devices/{}/endpoints/{}/cdata?name=alarmCmd HTTP/1.1\r\ncontent-length: 29\r\ncontent-type: application/json; charset=utf-8\r\ntransac-id: request_124\r\n\r\n\r\n{"value":"ON","pwd":{}}\r\n\r\n"
         # HOME "PUT /devices/{}/endpoints/{}/cdata?name=zoneCmd HTTP/1.1\r\ncontent-length: 41\r\ncontent-type: application/json; charset=utf-8\r\ntransac-id: request_46\r\n\r\n\r\n{"value":"ON","pwd":"{}","zones":[1]}\r\n\r\n"
@@ -355,9 +357,7 @@ class TydomClient:
                 body = '{"pwd":"' + str(pin_to_use) + '"}'
             elif zone_id is None:
                 cmd = "alarmCmd"
-                body = (
-                    '{"value":"' + str(value) + '","pwd":"' + str(pin_to_use) + '"}'
-                )
+                body = '{"value":"' + str(value) + '","pwd":"' + str(pin_to_use) + '"}'
             else:
                 cmd = "zoneCmd"
                 body = (

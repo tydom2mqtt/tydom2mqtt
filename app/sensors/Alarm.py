@@ -44,7 +44,9 @@ class Alarm:
 
         if self.alarm_pin is None:
             self.config["code"] = "REMOTE_CODE"
-            self.config["command_template"] = '{ "action": "{{ action }}", "code": "{{ code }}" }'
+            self.config["command_template"] = (
+                '{ "action": "{{ action }}", "code": "{{ code }}" }'
+            )
             self.config["code_arm_required"] = True
 
         self.config["json_attributes_topic"] = alarm_attributes_topic.format(id=self.id)
@@ -96,7 +98,13 @@ class Alarm:
 
     @staticmethod
     async def put_alarm_state(
-        tydom_client, device_id, alarm_id, home_zone, night_zone, asked_state=None, pin=None
+        tydom_client,
+        device_id,
+        alarm_id,
+        home_zone,
+        night_zone,
+        asked_state=None,
+        pin=None,
     ):
         value = None
         zone_id = None
@@ -125,5 +133,9 @@ class Alarm:
             zone_id = None
 
         await tydom_client.put_alarm_cdata(
-            device_id=device_id, alarm_id=alarm_id, value=value, zone_id=zone_id, pin=pin
+            device_id=device_id,
+            alarm_id=alarm_id,
+            value=value,
+            zone_id=zone_id,
+            pin=pin,
         )
