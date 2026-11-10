@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 from http.client import HTTPResponse
 from http.server import BaseHTTPRequestHandler
 from io import BytesIO
@@ -405,6 +406,8 @@ class MessageHandler:
                 msg_type = "msg_html"
             elif "productName" in first:
                 msg_type = "msg_info"
+            elif "mode" in first and "support" in data:
+                msg_type = "msg_area_authorization"
 
             if msg_type is None:
                 logger.warning("Unknown message type received (%s)", data)
@@ -432,6 +435,14 @@ class MessageHandler:
 
                     elif msg_type == "msg_info":
                         pass
+
+                    elif msg_type == "msg_area_authorization":
+                        parsed = json.loads(data)
+                        logger.debug(
+                            "Zone authorization notification: mode=%s support=%s",
+                            parsed.get("mode"),
+                            parsed.get("support"),
+                        )
                 except Exception as e:
                     logger.error("Error on parsing tydom response (%s)", e)
                     logger.error("Incoming data (%s)", data)
@@ -709,7 +720,40 @@ class MessageHandler:
                             attr_sensor["name"] = print_id
                             attr_sensor["device_type"] = "sensor"
                             attr_sensor["element_name"] = element_name
-                            attr_sensor[element_name] = element_value
+
+                            # Normalize value types and enrich HA discovery for graphing
+                            normalized_value = element_value
+                            try:
+                                # Convert common numeric strings (e.g., "123 W", "12,3") to number
+                                if isinstance(normalized_value, str):
+                                    sanitized = normalized_value.replace(",", ".")
+                                    match = re.search(
+                                        r"[-+]?[0-9]*\.?[0-9]+", sanitized
+                                    )
+                                    if match:
+                                        val_str = match.group(0)
+                                        normalized_value = (
+                                            float(val_str)
+                                            if "." in val_str
+                                            else int(val_str)
+                                        )
+                            except Exception:
+                                # Keep original value if conversion fails
+                                normalized_value = element_value
+
+                            # Home Assistant typing and units
+                            if element_name == "outTemperature":
+                                # Temperature in Celsius
+                                attr_sensor["device_class"] = "temperature"
+                                attr_sensor["state_class"] = "measurement"
+                                attr_sensor["unit_of_measurement"] = "°C"
+                            elif element_name == "lightPower":
+                                # Power in Watts
+                                attr_sensor["device_class"] = "power"
+                                attr_sensor["state_class"] = "measurement"
+                                attr_sensor["unit_of_measurement"] = "W"
+
+                            attr_sensor[element_name] = normalized_value
 
                     if type_of_id == "boiler":
                         if (
