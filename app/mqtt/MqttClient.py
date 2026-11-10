@@ -236,20 +236,25 @@ class MqttClient:
 
         elif ("set_alarm_state" in str(topic)) and "homeassistant" not in str(topic):
             value = payload.decode()
-            logger.info(
-                "set_alarm_state message received (topic=%s, message=%s)", topic, value
-            )
             get_id = (topic.split("/"))[2]
             device_id = (get_id.split("_"))[0]
             endpoint_id = (get_id.split("_"))[1]
-            action = payload
+            # Payload is either the raw action ("ARM_AWAY") or JSON {"action": ..., "code": ...} sent by Home
+            # Assistant when the code is typed in its keypad (code: REMOTE_CODE).
+            action = value
             code = None
-            try: # try to decode the JSON payload, it it fails then the action will be the raw payload (like)
-                data = json.loads(payload)
-                action = data.get("action", action)
-                code = data.get("code")
-            except json.JSONDecodeError:
+            try:
+                data = json.loads(value)
+                if isinstance(data, dict):
+                    action = data.get("action", action)
+                    code = data.get("code") or None
+            except ValueError:
                 pass
+            # never log the code
+            logger.info(
+                "set_alarm_state message received (topic=%s, action=%s, code=%s)",
+                topic, action, "provided" if code else "none",
+            )
             await Alarm.put_alarm_state(
                 tydom_client=self.tydom,
                 device_id=device_id,
